@@ -28,6 +28,7 @@ import {
 } from "./validation/schemas";
 import { AppError, ApiErrorResponse } from "./types/errors";
 import { randomUUID } from "crypto";
+import { requestLoggingMiddleware } from "./middleware/requestLogging";
 
 export const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -44,6 +45,9 @@ app.use((req: Request & { requestId?: string }, _res: Response, next: express.Ne
   req.requestId = randomUUID();
   next();
 });
+
+// Request Logging Middleware
+app.use(requestLoggingMiddleware);
 
 function sendValidationError(issues: z.ZodIssue[]) {
   throw new AppError(
