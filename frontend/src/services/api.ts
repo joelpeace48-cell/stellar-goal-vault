@@ -9,9 +9,25 @@ import {
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 async function parseResponse<T>(response: Response): Promise<T> {
-  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  const body = (await response.json().catch(() => ({}))) as T & {
+    error?: {
+      code: string;
+      message: string;
+      details?: Array<{ field: string; message: string }>;
+      requestId?: string;
+    };
+  };
+
   if (!response.ok) {
-    throw new Error(body.error ?? "Unexpected API error");
+    const errorMsg = body.error?.message ?? "Unexpected API error";
+    const error = new Error(errorMsg);
+    // Attach extra metadata if available
+    if (body.error) {
+      (error as any).code = body.error.code;
+      (error as any).details = body.error.details;
+      (error as any).requestId = body.error.requestId;
+    }
+    throw error;
   }
   return body;
 }

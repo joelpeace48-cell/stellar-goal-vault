@@ -1,11 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Campaign } from "../types/campaign";
+import { Campaign, ApiError } from "../types/campaign";
 import { ContributorSummary } from "./ContributorSummary";
 
 interface CampaignDetailPanelProps {
   campaign: Campaign | null;
-  isLoading?: boolean;
-  actionError?: string | null;
+
   actionMessage?: string | null;
   isPledgePending?: boolean;
   onPledge: (campaignId: string, contributor: string, amount: number) => Promise<void>;
@@ -175,7 +174,17 @@ export function CampaignDetailPanel({
       {isPledgePending ? (
         <p className="pending-note">Pledge is pending confirmation and will reconcile automatically.</p>
       ) : null}
-      {actionError ? <p className="form-error">{actionError}</p> : null}
+      {actionError ? (
+        <div className="form-error">
+          <p>{actionError.message}</p>
+          {actionError.code && (
+            <small className="error-meta">
+              Code: {actionError.code}
+              {actionError.requestId && ` | Request ID: ${actionError.requestId}`}
+            </small>
+          )}
+        </div>
+      ) : null}
       {actionMessage ? <p className="form-success">{actionMessage}</p> : null}
 
       {activeCampaign.metadata?.imageUrl && (

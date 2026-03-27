@@ -195,6 +195,37 @@ textarea {
   border: 1px solid #bbf7d0;
 }
 
+.form-error {
+  background: var(--error-bg, #fff5f5);
+  border: 1px solid var(--error-border, #feb2b2);
+  color: var(--error-text, #c53030);
+  padding: 1rem;
+  border-radius: 8px;
+  grid-column: 1 / -1;
+  font-size: 0.9375rem;
+}
+
+.error-meta {
+  display: block;
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.error-details {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  padding-left: 0.5rem;
+  border-left: 2px solid currentColor;
+}
+
+.error-details li {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
 .pending-note {
   color: #92400e;
   background: #fffbeb;

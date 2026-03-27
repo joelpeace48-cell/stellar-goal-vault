@@ -1,9 +1,9 @@
 import { FormEvent, useState, useEffect } from "react";
-import { CreateCampaignPayload } from "../types/campaign";
+import { CreateCampaignPayload, ApiError } from "../types/campaign";
 
 interface CreateCampaignFormProps {
   onCreate: (payload: CreateCampaignPayload) => Promise<void>;
-  apiError?: string | null;
+  apiError?: ApiError | null;
 }
 
 const INITIAL_VALUES = {
@@ -174,7 +174,26 @@ export function CreateCampaignForm({ onCreate, apiError }: CreateCampaignFormPro
           </label>
         </div>
 
-        {apiError ? <p className="form-error">{apiError}</p> : null}
+        {apiError ? (
+          <div className="form-error">
+            <p>{apiError.message}</p>
+            {apiError.details && apiError.details.length > 0 && (
+              <ul className="error-details">
+                {apiError.details.map((detail, index) => (
+                  <li key={index}>
+                    <strong>{detail.field}:</strong> {detail.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {apiError.code && (
+              <small className="error-meta">
+                Code: {apiError.code}
+                {apiError.requestId && ` | Request ID: ${apiError.requestId}`}
+              </small>
+            )}
+          </div>
+        ) : null}
 
         <button className="btn-primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Creating..." : "Create campaign"}

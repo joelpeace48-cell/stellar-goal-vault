@@ -14,7 +14,7 @@ import {
   listOpenIssues,
   refundCampaign,
 } from "./services/api";
-import { Campaign, CampaignEvent, OpenIssue } from "./types/campaign";
+import { Campaign, CampaignEvent, OpenIssue, ApiError } from "./types/campaign";
 
 function round(value: number): number {
   return Number(value.toFixed(2));
@@ -85,8 +85,8 @@ function App() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedCampaignDetails, setSelectedCampaignDetails] = useState<Campaign | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<ApiError | null>(null);
+  const [actionError, setActionError] = useState<ApiError | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [pendingPledgeCampaignId, setPendingPledgeCampaignId] = useState<string | null>(null);
   const [invalidUrlCampaignId, setInvalidUrlCampaignId] = useState<string | null>(null);
@@ -195,9 +195,7 @@ function App() {
       ]);
       setActionMessage(`Campaign #${campaign.id} is live and ready for pledges.`);
     } catch (error) {
-      setCreateError(
-        error instanceof Error ? error.message : "Failed to create campaign.",
-      );
+
     }
   }
 
@@ -270,9 +268,7 @@ function App() {
       await refreshSelectedCampaign(campaignId);
       if (selectedCampaignId === campaignId) setHistory(previousHistory);
       setPendingPledgeCampaignId(null);
-      setActionError(
-        error instanceof Error ? error.message : "Failed to add pledge.",
-      );
+
       setActionMessage(null);
     }
   }
@@ -289,9 +285,7 @@ function App() {
       ]);
       setActionMessage("Campaign claimed successfully.");
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Failed to claim campaign.",
-      );
+
     }
   }
 
@@ -307,9 +301,7 @@ function App() {
       ]);
       setActionMessage("Refund recorded for the selected contributor.");
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Failed to refund contributor.",
-      );
+
     }
   }
 

@@ -75,3 +75,10 @@ export interface OpenIssue {
   complexity: "Trivial" | "Medium" | "High";
   points: 100 | 150 | 200;
 }
+
+export interface ApiError {
+  message: string;
+  code?: string;
+  details?: Array<{ field: string; message: string }>;
+  requestId?: string;
+}
