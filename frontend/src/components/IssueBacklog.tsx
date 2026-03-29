@@ -7,13 +7,24 @@ interface IssueBacklogProps {
   isLoading?: boolean;
 }
 
-export function IssueBacklog({ issues, isLoading = false }: IssueBacklogProps) {
+export function IssueBacklog({ issues, isLoading }: IssueBacklogProps) {
+  if (issues.length === 0) {
+    return (
+      <EmptyState
+        variant="card"
+        icon={ListTodo}
+        title="Contribution backlog"
+        message="No backlog items yet."
+      />
+    );
+  }
+
   return (
     <section className="card">
       <div className="section-heading">
         <h2>Contribution backlog</h2>
         <p className="muted">
-          Ready-to-open issue ideas for the public repo once this MVP is pushed.
+          Ready-to-open issue ideas for your public repo after you push it.
         </p>
       </div>
 

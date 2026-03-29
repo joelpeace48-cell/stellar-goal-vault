@@ -221,6 +221,7 @@ export function CampaignDetailPanel({
           >
             {isPledgePending ? "Simulating / waiting..." : "Sign pledge with Freighter"}
           </button>
+
           <button
             className="btn-ghost"
             type="button"
@@ -250,6 +251,7 @@ export function CampaignDetailPanel({
             disabled={
               isSubmitting ||
               !activeCampaign.progress.canRefund ||
+              contributor.trim().length === 0
               refundContributor.trim().length === 0
             }
             onClick={handleRefund}
@@ -266,7 +268,7 @@ export function CampaignDetailPanel({
         </p>
       ) : null}
 
-      {actionError ? (
+      {actionError && (
         <div className="form-error">
           <p>{actionError.message}</p>
           {actionError.details && actionError.details.length > 0 ? (
@@ -285,9 +287,9 @@ export function CampaignDetailPanel({
             </small>
           ) : null}
         </div>
-      ) : null}
+      )}
 
-      {actionMessage ? <p className="form-success">{actionMessage}</p> : null}
+      {actionMessage && <p className="form-success">{actionMessage}</p>}
 
       {activeCampaign.metadata?.imageUrl ? (
         <div className="campaign-image-container">

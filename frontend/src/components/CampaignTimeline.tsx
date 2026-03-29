@@ -26,15 +26,15 @@ function describeEvent(event: CampaignEvent): string {
   }
 }
 
-export function CampaignTimeline({ history, isLoading = false }: CampaignTimelineProps) {
-  if (isLoading) {
+export function CampaignTimeline({ history, isLoading }: CampaignTimelineProps) {
+  if (history.length === 0) {
     return (
-      <section className="card">
-        <div className="section-heading">
-          <h2>Timeline</h2>
-          <p className="muted">Loading campaign activity...</p>
-        </div>
-      </section>
+      <EmptyState
+        variant="card"
+        icon={History}
+        title="Timeline"
+        message="No activity yet. Events will appear here as campaigns are created and pledged."
+      />
     );
   }
 
@@ -43,8 +43,7 @@ export function CampaignTimeline({ history, isLoading = false }: CampaignTimelin
       <div className="section-heading">
         <h2>Timeline</h2>
         <p className="muted">
-          Each local or reconciled on-chain action is recorded so contributors can follow
-          campaign activity.
+          Each action is stored locally so contributors can follow campaign activity.
         </p>
       </div>
 

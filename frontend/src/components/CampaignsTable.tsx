@@ -10,16 +10,43 @@ interface CampaignsTableProps {
   selectedCampaignId: string | null;
   onSelect: (campaignId: string) => void;
   isLoading?: boolean;
+  invalidUrlCampaignId?: string | null;
 }
 
 function formatTimestamp(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleString();
 }
 
+interface AssetFilterDropdownProps {
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+function AssetFilterDropdown({ options, value, onChange, disabled }: AssetFilterDropdownProps) {
+  return (
+    <select
+      className="filter-select"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    >
+      <option value="">All assets</option>
+      {options.map((code) => (
+        <option key={code} value={code}>
+          {code}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function CampaignsTable({
   campaigns,
   selectedCampaignId,
   onSelect,
+  invalidUrlCampaignId,
   isLoading = false,
 }: CampaignsTableProps) {
   const [selectedAssetCode, setSelectedAssetCode] = useState("");
@@ -40,7 +67,7 @@ export function CampaignsTable({
     );
   }
 
-  if (campaigns.length === 0) {
+  if (isEmpty) {
     return (
       <EmptyState
         variant="card"
@@ -55,10 +82,23 @@ export function CampaignsTable({
     <section className="card">
       <div className="section-heading">
         <h2>Campaign board</h2>
-        <p className="muted">
-          Monitor progress and open one campaign at a time in the action panel.
-        </p>
+        {isEmpty ? (
+          <p className="muted">
+            No campaigns yet. Create the first vault to make this board active.
+          </p>
+        ) : (
+          <p className="muted">
+            Monitor progress and open one campaign at a time in the action panel.
+          </p>
+        )}
       </div>
+
+      {invalidUrlCampaignId && (
+        <p className="banner-warn muted">
+          Campaign <code>#{invalidUrlCampaignId}</code> from the URL was not found.
+          Showing the first available campaign instead.
+        </p>
+      )}
 
       <div className="board-controls">
         <AssetFilterDropdown
@@ -70,7 +110,7 @@ export function CampaignsTable({
       </div>
 
       {filteredCampaigns.length === 0 ? (
-        <p className="muted">No campaigns match the current asset filter.</p>
+        <p className="muted">No campaigns match the current filters.</p>
       ) : (
         <div className="table-wrap">
           <table>
@@ -85,7 +125,7 @@ export function CampaignsTable({
               </tr>
             </thead>
             <tbody>
-              {filteredCampaigns.map((campaign) => (
+              {filteredCampaigns.map((campaign: Campaign) => (
                 <tr key={campaign.id}>
                   <td>
                     <div className="stacked">

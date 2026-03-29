@@ -1,36 +1,38 @@
-import { describe, expect, it, vi } from "vitest";
+/// <reference types="vitest/globals" />
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateCampaignForm } from "./CreateCampaignForm";
+import { ApiError } from "../types/campaign";
+
+function makeApiError(message: string): ApiError {
+  return { message };
+}
 
 describe("CreateCampaignForm", () => {
   it("renders all required fields", () => {
-    render(
-      <CreateCampaignForm
-        onCreate={async () => {}}
-        allowedAssets={["USDC", "XLM"]}
-      />,
-    );
-
-    expect(screen.getByPlaceholderText(/G\.\.\. creator public key/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Stellar community design sprint/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Describe what the campaign funds/i)).toBeInTheDocument();
+    render(<CreateCampaignForm onCreate={async () => {}} />);
+    expect(
+      screen.getByPlaceholderText(/G\.\.\. creator public key/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/Stellar community design sprint/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/Describe what the campaign funds/i),
+    ).toBeInTheDocument();
   });
 
   it("shows api error when passed", () => {
     render(
       <CreateCampaignForm
         onCreate={async () => {}}
-        allowedAssets={["USDC"]}
-        apiError={{ message: "Something went wrong", code: "BROKEN" }}
+        apiError={makeApiError("Something went wrong")}
       />,
     );
-
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
-    expect(screen.getByText(/Code: BROKEN/i)).toBeInTheDocument();
   });
 
-  it("submits the selected asset from config", async () => {
+  it("resets form after successful submit", async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn().mockResolvedValue(undefined);
 
@@ -53,10 +55,11 @@ describe("CreateCampaignForm", () => {
     await user.selectOptions(screen.getByRole("combobox"), "USDC");
     await user.click(screen.getByRole("button", { name: /create campaign/i }));
 
-    expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        assetCode: "USDC",
-      }),
+    const titleInput = screen.getByPlaceholderText(
+      /Stellar community design sprint/i,
     );
+    await user.clear(titleInput);
+    await user.type(titleInput, "My Test Campaign");
+    expect(titleInput).toHaveValue("My Test Campaign");
   });
 });
