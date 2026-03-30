@@ -8,13 +8,24 @@ interface IssueBacklogProps {
 }
 
 export function IssueBacklog({ issues, isLoading }: IssueBacklogProps) {
+  if (isLoading) {
+    return (
+      <section className="card">
+        <div className="section-heading">
+          <h2>Contribution backlog</h2>
+          <p className="muted">Loading open issue ideas...</p>
+        </div>
+      </section>
+    );
+  }
+
   if (issues.length === 0) {
     return (
       <EmptyState
         variant="card"
         icon={ListTodo}
         title="Contribution backlog"
-        message="No backlog items yet."
+        message="No seeded issues are available right now."
       />
     );
   }
@@ -28,35 +39,25 @@ export function IssueBacklog({ issues, isLoading }: IssueBacklogProps) {
         </p>
       </div>
 
-      {isLoading ? (
-        <p className="muted">Loading contribution ideas...</p>
-      ) : issues.length === 0 ? (
-        <EmptyState
-          icon={ListTodo}
-          title="No seeded issues"
-          message="The repo can still be extended, but the example backlog is empty right now."
-        />
-      ) : (
-        <div className="issue-list">
-          {issues.map((issue) => (
-            <article key={issue.id} className="issue-item">
-              <div className="issue-topline">
-                <strong>{issue.title}</strong>
-                <span className="badge badge-neutral">{issue.points} pts</span>
-              </div>
-              <p>{issue.summary}</p>
-              <div className="chip-row">
-                {issue.labels.map((label) => (
-                  <span key={label} className="chip">
-                    {label}
-                  </span>
-                ))}
-                <span className="chip-emphasis">{issue.complexity}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+      <div className="issue-list">
+        {issues.map((issue) => (
+          <article key={issue.id} className="issue-item">
+            <div className="issue-topline">
+              <strong>{issue.title}</strong>
+              <span className="badge badge-neutral">{issue.points} pts</span>
+            </div>
+            <p>{issue.summary}</p>
+            <div className="chip-row">
+              {issue.labels.map((label) => (
+                <span key={label} className="chip">
+                  {label}
+                </span>
+              ))}
+              <span className="chip-emphasis">{issue.complexity}</span>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

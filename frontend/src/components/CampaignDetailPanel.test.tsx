@@ -1,38 +1,33 @@
-/// <reference types="vitest/globals" />
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 import { CampaignDetailPanel } from "./CampaignDetailPanel";
-import { ApiError, Campaign } from "../types/campaign";
+import { Campaign } from "../types/campaign";
 
 const mockCampaign: Campaign = {
-  id: "camp-1",
+  id: "1",
   title: "Test Campaign",
   description: "A test campaign description",
-  creator: "GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456789",
+  creator: `G${"A".repeat(55)}`,
   assetCode: "USDC",
-  targetAmount: 500,
-  pledgedAmount: 400,
+  targetAmount: 100,
+  pledgedAmount: 0,
   deadline: Math.floor(Date.now() / 1000) + 3600,
   createdAt: Math.floor(Date.now() / 1000),
   pledges: [],
   progress: {
     status: "open",
-    percentFunded: 80,
+    percentFunded: 0,
     remainingAmount: 100,
     hoursLeft: 1,
     pledgeCount: 0,
-    hoursLeft: 2,
+    hoursLeft: 1,
     canPledge: true,
     canClaim: false,
     canRefund: false,
   },
   metadata: {},
 };
-
-// Helper: a minimal valid ApiError object
-function makeApiError(message: string): ApiError {
-  return { message };
-}
 
 describe("CampaignDetailPanel", () => {
   it("shows empty state when no campaign selected", () => {
@@ -71,7 +66,7 @@ describe("CampaignDetailPanel", () => {
     render(
       <CampaignDetailPanel
         campaign={mockCampaign}
-        actionError={makeApiError("Pledge failed")}
+        actionError={{ message: "Pledge failed" }}
         onPledge={async () => {}}
         onClaim={async () => {}}
         onRefund={async () => {}}
@@ -113,7 +108,7 @@ describe("CampaignDetailPanel", () => {
 
     await user.type(
       screen.getByPlaceholderText(/G\.\.\. contributor public key/i),
-      "GTEST123",
+      `G${"B".repeat(55)}`,
     );
     await user.click(screen.getByText("Add pledge"));
     expect(onPledge).toHaveBeenCalled();
@@ -127,7 +122,7 @@ describe("CampaignDetailPanel", () => {
     render(
       <CampaignDetailPanel
         campaign={mockCampaign}
-        actionError={makeApiError("Pledge failed")}
+        actionError={{ message: "Pledge failed" }}
         onPledge={onPledge}
         onClaim={async () => {}}
         onRefund={async () => {}}
@@ -136,7 +131,7 @@ describe("CampaignDetailPanel", () => {
 
     await user.type(
       screen.getByPlaceholderText(/G\.\.\. contributor public key/i),
-      "GTEST123",
+      `G${"B".repeat(55)}`,
     );
     await user.click(screen.getByText("Add pledge"));
     expect(screen.getByText("Pledge failed")).toBeInTheDocument();

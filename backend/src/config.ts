@@ -27,11 +27,10 @@ export const config = {
   corsAllowedOrigins: parseOrigins(
     process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:5173",
   ),
-  sorobanRpcUrl: process.env.SOROBAN_RPC_URL?.trim() || "https://soroban-testnet.stellar.org:443",
-  contractId: process.env.CONTRACT_ID?.trim() || "",
-  networkPassphrase:
-    process.env.NETWORK_PASSPHRASE?.trim() || DEFAULT_NETWORK_PASSPHRASE,
-  contractAmountDecimals: parseInteger(process.env.CONTRACT_AMOUNT_DECIMALS, 2),
+  sorobanRpcUrl: process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443",
+  contractId: process.env.CONTRACT_ID ?? "",
+  sorobanNetworkPassphrase:
+    process.env.SOROBAN_NETWORK_PASSPHRASE ?? "Test SDF Network ; September 2015",
 };
 
 export const walletIntegrationReady = Boolean(config.contractId && config.sorobanRpcUrl);

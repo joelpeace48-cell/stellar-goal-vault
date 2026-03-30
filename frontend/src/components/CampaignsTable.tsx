@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
 import { LayoutGrid } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Campaign } from "../types/campaign";
-import { AssetFilterDropdown } from "./AssetFilterDropdown";
 import { EmptyState } from "./EmptyState";
-import { CampaignCard } from "./CampaignCard";
+import { AssetFilterDropdown } from "./AssetFilterDropdown";
 import { applyFilters, getDistinctAssetCodes } from "./campaignsTableUtils";
 
 interface CampaignsTableProps {
@@ -28,17 +27,14 @@ export function CampaignsTable({
   isLoading = false,
 }: CampaignsTableProps) {
   const [selectedAssetCode, setSelectedAssetCode] = useState("");
-  const distinctAssetCodes = useMemo(
-    () => getDistinctAssetCodes(campaigns),
-    [campaigns],
-  );
+  const distinctAssetCodes = useMemo(() => getDistinctAssetCodes(campaigns), [campaigns]);
   const filteredCampaigns = useMemo(
     () => applyFilters(campaigns, selectedAssetCode, ""),
     [campaigns, selectedAssetCode],
   );
   const isEmpty = campaigns.length === 0;
 
-  if (isLoading) {
+  if (isLoading && isEmpty) {
     return (
       <section className="card">
         <div className="section-heading">
@@ -64,16 +60,9 @@ export function CampaignsTable({
     <section className="card">
       <div className="section-heading">
         <h2>Campaign board</h2>
-        {isEmpty ? (
-          <p className="muted">
-            No campaigns yet. Create the first vault to make this board active.
-          </p>
-        ) : (
-          <p className="muted">
-            Monitor progress and open one campaign at a time in the action
-            panel.
-          </p>
-        )}
+        <p className="muted">
+          Monitor progress and open one campaign at a time in the action panel.
+        </p>
       </div>
 
       {invalidUrlCampaignId && (
@@ -88,103 +77,71 @@ export function CampaignsTable({
           options={distinctAssetCodes}
           value={selectedAssetCode}
           onChange={setSelectedAssetCode}
-          disabled={campaigns.length === 0}
+          disabled={false}
         />
       </div>
 
       {filteredCampaigns.length === 0 ? (
         <p className="muted">No campaigns match the current filters.</p>
       ) : (
-        <>
-          {/* Desktop / larger screens: table view */}
-          <div className="table-only">
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Campaign</th>
-                    <th>Creator</th>
-                    <th>Funding</th>
-                    <th>Status</th>
-                    <th>Deadline</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCampaigns.map((campaign: Campaign) => (
-                    <tr key={campaign.id}>
-                      <td>
-                        <div className="stacked">
-                          <strong>{campaign.title}</strong>
-                          <span className="muted">#{campaign.id}</span>
-                        </div>
-                      </td>
-                      <td className="mono">
-                        {campaign.creator.slice(0, 8)}...
-                      </td>
-                      <td>
-                        <div className="progress-copy">
-                          {campaign.pledgedAmount} / {campaign.targetAmount}{" "}
-                          {campaign.assetCode}
-                        </div>
-                        <div className="progress-bar" aria-hidden>
-                          <div
-                            style={{
-                              width: `${Math.min(campaign.progress.percentFunded, 100)}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="muted">
-                          {campaign.progress.percentFunded}% funded
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge badge-${campaign.progress.status}`}
-                        >
-                          {campaign.progress.status}
-                        </span>
-                      </td>
-                      <td className="stacked">
-                        <span>{formatTimestamp(campaign.deadline)}</span>
-                        <span className="muted">
-                          {campaign.progress.hoursLeft}h left
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className={
-                            selectedCampaignId === campaign.id
-                              ? "btn-secondary"
-                              : "btn-ghost"
-                          }
-                          type="button"
-                          onClick={() => onSelect(campaign.id)}
-                        >
-                          {selectedCampaignId === campaign.id
-                            ? "Selected"
-                            : "View"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Mobile / small screens: stacked card view */}
-          <div className="cards-only">
-            {filteredCampaigns.map((campaign: Campaign) => (
-              <CampaignCard
-                key={campaign.id}
-                campaign={campaign}
-                selectedCampaignId={selectedCampaignId}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
-        </>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Creator</th>
+                <th>Funding</th>
+                <th>Status</th>
+                <th>Deadline</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCampaigns.map((campaign) => (
+                <tr key={campaign.id}>
+                  <td>
+                    <div className="stacked">
+                      <strong>{campaign.title}</strong>
+                      <span className="muted">#{campaign.id}</span>
+                    </div>
+                  </td>
+                  <td className="mono">{campaign.creator.slice(0, 8)}...</td>
+                  <td>
+                    <div className="progress-copy">
+                      {campaign.pledgedAmount} / {campaign.targetAmount} {campaign.assetCode}
+                    </div>
+                    <div className="progress-bar" aria-hidden>
+                      <div
+                        style={{
+                          width: `${Math.min(campaign.progress.percentFunded, 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="muted">{campaign.progress.percentFunded}% funded</span>
+                  </td>
+                  <td>
+                    <span className={`badge badge-${campaign.progress.status}`}>
+                      {campaign.progress.status}
+                    </span>
+                  </td>
+                  <td className="stacked">
+                    <span>{formatTimestamp(campaign.deadline)}</span>
+                    <span className="muted">{campaign.progress.hoursLeft}h left</span>
+                  </td>
+                  <td>
+                    <button
+                      className={selectedCampaignId === campaign.id ? "btn-secondary" : "btn-ghost"}
+                      type="button"
+                      onClick={() => onSelect(campaign.id)}
+                    >
+                      {selectedCampaignId === campaign.id ? "Selected" : "View"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

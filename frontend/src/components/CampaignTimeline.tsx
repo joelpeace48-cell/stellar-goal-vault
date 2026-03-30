@@ -10,6 +10,14 @@ function formatTimestamp(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleString();
 }
 
+function truncate(value: string, start = 10, end = 8): string {
+  if (value.length <= start + end + 1) {
+    return value;
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+}
+
 function describeEvent(event: CampaignEvent): string {
   switch (event.eventType) {
     case "created":
@@ -25,14 +33,72 @@ function describeEvent(event: CampaignEvent): string {
   }
 }
 
-export function CampaignTimeline({ history }: CampaignTimelineProps) {
+function getMetadataLines(event: CampaignEvent): string[] {
+  const metadata = event.metadata ?? {};
+  const lines: string[] = [];
+
+  if (event.actor) {
+    lines.push(`Actor: ${truncate(event.actor)}`);
+  }
+
+  if (typeof event.amount === "number") {
+    lines.push(`Amount: ${event.amount}`);
+  }
+
+  if (typeof metadata.refundedPledgeCount === "number") {
+    lines.push(`Refunded pledges: ${metadata.refundedPledgeCount}`);
+  }
+
+  if (typeof metadata.txHash === "string") {
+    lines.push(`Tx: ${truncate(metadata.txHash, 12, 10)}`);
+  }
+
+  if (typeof metadata.walletAddress === "string") {
+    lines.push(`Wallet: ${truncate(metadata.walletAddress)}`);
+  }
+
+  if (typeof metadata.refundSource === "string") {
+    lines.push(`Source: ${String(metadata.refundSource)}`);
+  }
+
+  if (typeof metadata.contractId === "string") {
+    lines.push(`Contract: ${truncate(metadata.contractId, 12, 10)}`);
+  }
+
+  if (typeof metadata.rpcUrl === "string") {
+    lines.push(`RPC: ${String(metadata.rpcUrl)}`);
+  }
+
+  if (typeof metadata.ledger === "number") {
+    lines.push(`Ledger: ${metadata.ledger}`);
+  }
+
+  if (typeof metadata.latestLedger === "number") {
+    lines.push(`Latest ledger seen: ${metadata.latestLedger}`);
+  }
+
+  return lines;
+}
+
+export function CampaignTimeline({ history, isLoading }: CampaignTimelineProps) {
+  if (isLoading) {
+    return (
+      <section className="card">
+        <div className="section-heading">
+          <h2>Timeline</h2>
+          <p className="muted">Loading campaign activity...</p>
+        </div>
+      </section>
+    );
+  }
+
   if (history.length === 0) {
     return (
       <EmptyState
         variant="card"
         icon={History}
         title="Timeline"
-        message="No activity yet. Events will appear here as campaigns are created and pledged."
+        message="No campaign activity yet. New Soroban and local events will appear here."
       />
     );
   }
@@ -42,57 +108,38 @@ export function CampaignTimeline({ history }: CampaignTimelineProps) {
       <div className="section-heading">
         <h2>Timeline</h2>
         <p className="muted">
-          Each action is stored locally so contributors can follow campaign
-          activity.
+          Local history is reconciled after successful contract actions so contributors can inspect refund metadata.
         </p>
       </div>
 
-      {history.length === 0 ? (
-        <EmptyState
-          icon={History}
-          title="No events yet"
-          message="Campaign activity will appear here after create, pledge, claim, or refund actions."
-        />
-      ) : (
-        <div className="timeline">
-          {[...history].reverse().map((event) => {
-            const isPending = event.metadata?.pending === true;
-            const txHash =
-              typeof event.metadata?.txHash === "string"
-                ? event.metadata.txHash
-                : event.blockchainMetadata?.txHash;
+      <div className="timeline">
+        {history.map((event) => {
+          const isPending = event.metadata?.pending === true;
+          const metadataLines = getMetadataLines(event);
 
-            return (
-              <article
-                key={event.id}
-                className={`timeline-item ${isPending ? "pending" : ""}`}
-              >
-                <div className="timeline-dot" aria-hidden />
-                <div className="timeline-copy">
-                  <strong>
-                    {describeEvent(event)}
-                    {isPending ? " (pending)" : ""}
-                  </strong>
-                  <span className="muted">
-                    {formatTimestamp(event.timestamp)}
-                  </span>
-                  <span className="muted">
-                    {event.actor
-                      ? `Actor: ${event.actor.slice(0, 12)}...`
-                      : "System event"}
-                    {typeof event.amount === "number"
-                      ? ` | Amount: ${event.amount}`
-                      : ""}
-                  </span>
-                  {txHash ? (
-                    <span className="mono muted">Tx hash: {txHash}</span>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+          return (
+            <article key={event.id} className={`timeline-item ${isPending ? "pending" : ""}`}>
+              <div className="timeline-dot" aria-hidden />
+              <div className="timeline-copy">
+                <strong>
+                  {describeEvent(event)}
+                  {isPending ? " (pending...)" : ""}
+                </strong>
+                <span className="muted">{formatTimestamp(event.timestamp)}</span>
+                {metadataLines.length > 0 ? (
+                  metadataLines.map((line) => (
+                    <span key={`${event.id}-${line}`} className="muted">
+                      {line}
+                    </span>
+                  ))
+                ) : (
+                  <span className="muted">System event</span>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }

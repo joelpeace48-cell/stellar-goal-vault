@@ -3,7 +3,7 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { config, walletIntegrationReady } from "./config";
+import { config } from "./config";
 import {
   addPledge,
   calculateProgress,
@@ -21,6 +21,7 @@ import {
 import { getCampaignHistory } from "./services/eventHistory";
 import { startEventIndexer } from "./services/eventIndexer";
 import { fetchOpenIssues } from "./services/openIssues";
+import { ensureSorobanRefundConfig, verifyRefundTransaction } from "./services/sorobanRpc";
 import { AppError, ApiErrorResponse } from "./types/errors";
 import {
   campaignIdSchema,
@@ -33,7 +34,6 @@ import {
   zodIssuesToErrorMessage,
   zodIssuesToValidationIssues,
 } from "./validation/schemas";
-import { checkDbHealth } from "./services/db";
 
 export const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -49,7 +49,6 @@ type CampaignListItem =
   ? ReturnType<typeof listCampaigns>[number] & { progress: Progress }
   : never;
 
-// Initialize DB
 initCampaignStore();
 
 app.use(
@@ -60,17 +59,10 @@ app.use(
 );
 app.use(express.json());
 
-// Request ID middleware
-app.use(
-  (
-    req: Request & { requestId?: string },
-    _res: Response,
-    next: express.NextFunction,
-  ) => {
-    req.requestId = randomUUID();
-    next();
-  },
-);
+app.use((req: Request & { requestId?: string }, _res: Response, next: express.NextFunction) => {
+  req.requestId = randomUUID();
+  next();
+});
 
 function sendValidationError(issues: z.ZodIssue[]) {
   throw new AppError(
@@ -183,35 +175,18 @@ app.get("/api/health", (_req: Request, res: Response) => {
 });
 
 app.get("/api/campaigns", (req: Request, res: Response) => {
-  const rawStatus = req.query.status;
-
-  // Validate status explicitly (to return 400 on invalid values)
-  let status: CampaignStatus | undefined;
-
-  if (rawStatus !== undefined) {
-    if (typeof rawStatus !== "string") {
-      throw new AppError(
-        "Invalid status query parameter.",
-        400,
-        "INVALID_STATUS",
-      );
-    }
-
-    const normalized = rawStatus.trim().toLowerCase();
-
-    if (!CAMPAIGN_STATUSES.includes(normalized as CampaignStatus)) {
-      throw new AppError(
-        `Invalid status. Allowed values: ${CAMPAIGN_STATUSES.join(", ")}`,
-        400,
-        "INVALID_STATUS",
-      );
-    }
-
-    status = normalized as CampaignStatus;
-  }
-
-  // Fetch campaigns
-  const campaigns = listCampaigns();
+  const searchQuery = normalizeQueryValue(req.query.q);
+  const filters = parseCampaignListFilters({
+    asset: req.query.asset,
+    status: req.query.status,
+  });
+  const data = filterCampaignList(
+    listCampaigns({ searchQuery }).map((campaign) => ({
+      ...campaign,
+      progress: calculateProgress(campaign),
+    })),
+    filters,
+  );
 
   // Attach progress
   let data: CampaignListItem[] = campaigns.map((campaign) => ({
@@ -345,7 +320,7 @@ app.post("/api/campaigns/:id/claim", (req: Request, res: Response) => {
   res.json({ data: { ...campaign, progress: calculateProgress(campaign) } });
 });
 
-app.post("/api/campaigns/:id/refund", (req: Request, res: Response) => {
+app.post("/api/campaigns/:id/refund", async (req: Request, res: Response) => {
   const parsedId = parseCampaignId(req.params.id);
   if (!parsedId.ok) {
     sendValidationError(parsedId.issues);
@@ -358,7 +333,22 @@ app.post("/api/campaigns/:id/refund", (req: Request, res: Response) => {
     return;
   }
 
-  const result = refundContributor(parsedId.value, parsedBody.data.contributor);
+  ensureSorobanRefundConfig();
+  const verified = await verifyRefundTransaction(parsedBody.data.soroban.txHash);
+
+  const result = refundContributor(
+    parsedId.value,
+    parsedBody.data.contributor,
+    {
+      ...parsedBody.data.soroban,
+      txHash: verified.txHash,
+      ledger: verified.ledger ?? parsedBody.data.soroban.ledger,
+      createdAt: verified.createdAt ?? parsedBody.data.soroban.createdAt,
+      latestLedger: verified.latestLedger ?? parsedBody.data.soroban.latestLedger,
+      source: "soroban-contract",
+    },
+  );
+
   res.json({
     data: {
       ...result.campaign,
@@ -392,32 +382,27 @@ app.get("/api/config", (_req: Request, res: Response) => {
   res.json({
     data: {
       allowedAssets: config.allowedAssets,
-      sorobanRpcUrl: config.sorobanRpcUrl,
-      contractId: config.contractId,
-      networkPassphrase: config.networkPassphrase,
-      contractAmountDecimals: config.contractAmountDecimals,
-      walletIntegrationReady,
+      soroban: {
+        enabled: Boolean(config.contractId),
+        contractId: config.contractId || undefined,
+        networkPassphrase: config.sorobanNetworkPassphrase,
+        rpcUrl: config.sorobanRpcUrl,
+      },
     },
   });
 });
 
-// Global Error Handler
-app.use(
-  (err: any, req: Request, res: Response, _next: express.NextFunction) => {
-    const statusCode =
-      err instanceof AppError ? err.statusCode : (err.statusCode ?? 500);
-    const code =
-      err instanceof AppError
-        ? err.code
-        : (err.code ?? "INTERNAL_SERVER_ERROR");
-    const response: ApiErrorResponse = {
-      success: false,
-      error: {
-        code,
-        message: err.message || "An unexpected error occurred",
-        requestId: (req as any).requestId,
-      },
-    };
+app.use((err: any, req: Request, res: Response, _next: express.NextFunction) => {
+  const statusCode = err instanceof AppError ? err.statusCode : (err.statusCode ?? 500);
+  const code = err instanceof AppError ? err.code : (err.code ?? "INTERNAL_SERVER_ERROR");
+  const response: ApiErrorResponse = {
+    success: false,
+    error: {
+      code,
+      message: err.message || "An unexpected error occurred",
+      requestId: (req as any).requestId,
+    },
+  };
 
     if (err instanceof AppError && err.details) {
       response.error.details = err.details;

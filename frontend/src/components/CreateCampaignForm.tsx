@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
-import { ApiError, CreateCampaignPayload } from "../types/campaign";
+import { FormEvent, useState, useEffect } from "react";
+import { getAppConfig } from "../services/api";
+import { CreateCampaignPayload, ApiError } from "../types/campaign";
 
 interface CreateCampaignFormProps {
   onCreate: (payload: CreateCampaignPayload) => Promise<void>;
@@ -27,21 +28,15 @@ export function CreateCampaignForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (allowedAssets.length === 0) {
-      return;
-    }
-
-    setValues((current) => {
-      if (allowedAssets.includes(current.assetCode)) {
-        return current;
-      }
-
-      return {
-        ...current,
-        assetCode: allowedAssets[0],
-      };
-    });
-  }, [allowedAssets]);
+    getAppConfig()
+      .then((appConfig) => {
+        if (appConfig.allowedAssets.length > 0) {
+          setAllowedAssets(appConfig.allowedAssets);
+          update("assetCode", appConfig.allowedAssets[0]);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   function update(field: keyof typeof INITIAL_VALUES, value: string) {
     setValues((current) => ({ ...current, [field]: value }));

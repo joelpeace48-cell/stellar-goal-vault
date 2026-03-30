@@ -5,7 +5,7 @@ import {
   CreateCampaignPayload,
   CreatePledgePayload,
   OpenIssue,
-  ReconcilePledgePayload,
+  SorobanRefundMetadata,
 } from "../types/campaign";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
@@ -111,11 +111,12 @@ export async function claimCampaign(
 export async function refundCampaign(
   campaignId: string,
   contributor: string,
+  soroban: SorobanRefundMetadata,
 ): Promise<Campaign> {
   const response = await fetch(`${API_BASE}/campaigns/${campaignId}/refund`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contributor }),
+    body: JSON.stringify({ contributor, soroban }),
   });
   const body = await parseResponse<{ data: Campaign }>(response);
   return body.data;
@@ -130,5 +131,11 @@ export async function getCampaignHistory(campaignId: string): Promise<CampaignEv
 export async function listOpenIssues(): Promise<OpenIssue[]> {
   const response = await fetch(`${API_BASE}/open-issues`);
   const body = await parseResponse<{ data: OpenIssue[] }>(response);
+  return body.data;
+}
+
+export async function getAppConfig(): Promise<AppConfig> {
+  const response = await fetch(`${API_BASE}/config`);
+  const body = await parseResponse<{ data: AppConfig }>(response);
   return body.data;
 }

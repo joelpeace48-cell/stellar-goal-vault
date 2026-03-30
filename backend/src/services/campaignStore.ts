@@ -64,6 +64,18 @@ export interface PledgeRecord {
   transactionHash?: string;
 }
 
+export interface RefundReconciliationInput {
+  txHash: string;
+  contractId?: string;
+  networkPassphrase?: string;
+  rpcUrl?: string;
+  walletAddress?: string;
+  ledger?: number;
+  createdAt?: number;
+  latestLedger?: number;
+  source?: "local" | "soroban-contract";
+}
+
 interface CampaignRow {
   id: string;
   creator: string;
@@ -530,9 +542,11 @@ function reconcileOnChainClaim(
   return getCampaign(campaignId)!;
 }
 
-export { reconcileOnChainClaim as claimCampaign };
-
-export function refundContributor(campaignId: string, contributor: string): {
+export function refundContributor(
+  campaignId: string,
+  contributor: string,
+  reconciliation?: RefundReconciliationInput,
+): {
   campaign: CampaignRecord;
   refundedAmount: number;
 } {
@@ -566,7 +580,7 @@ export function refundContributor(campaignId: string, contributor: string): {
   const refundedAmount = round(
     refundablePledges.reduce((sum, pledge) => sum + pledge.amount, 0),
   );
-  const refundedAt = nowInSeconds();
+  const refundedAt = reconciliation?.createdAt ?? nowInSeconds();
 
   db.prepare(
     `UPDATE pledges SET refunded_at = ? WHERE campaign_id = ? AND contributor = ? AND refunded_at IS NULL`,
@@ -577,17 +591,17 @@ export function refundContributor(campaignId: string, contributor: string): {
     campaignId,
   );
 
-  recordEvent(
-    campaignId,
-    "refunded",
-    refundedAt,
-    contributor,
-    refundedAmount,
-    {
-      refundedPledgeCount: refundablePledges.length,
-    },
-    { source: "local" } as BlockchainMetadata,
-  );
+  recordEvent(campaignId, "refunded", refundedAt, contributor, refundedAmount, {
+    refundedPledgeCount: refundablePledges.length,
+    refundSource: reconciliation?.source ?? "local",
+    txHash: reconciliation?.txHash,
+    contractId: reconciliation?.contractId,
+    networkPassphrase: reconciliation?.networkPassphrase,
+    rpcUrl: reconciliation?.rpcUrl,
+    walletAddress: reconciliation?.walletAddress,
+    ledger: reconciliation?.ledger,
+    latestLedger: reconciliation?.latestLedger,
+  });
 
   return {
     campaign: getCampaign(campaignId)!,

@@ -1,17 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
-import { MousePointer2, Wallet } from "lucide-react";
-import { CopyButton } from "./CopyButton";
-import { AppConfig, ApiError, Campaign } from "../types/campaign";
 import { ContributorSummary } from "./ContributorSummary";
 import { EmptyState } from "./EmptyState";
 
 interface CampaignDetailPanelProps {
   campaign: Campaign | null;
-  appConfig: AppConfig | null;
-  connectedWallet: string | null;
-  isConnectingWallet?: boolean;
   isLoading?: boolean;
-  actionError?: ApiError | null;
+  actionError?: ApiError | string | null;
   actionMessage?: string | null;
   isPledgePending?: boolean;
   onConnectWallet: () => Promise<void>;
@@ -98,7 +92,8 @@ export function CampaignDetailPanel({
   }
 
   const activeCampaign = campaign;
-  const walletReady = Boolean(appConfig?.walletIntegrationReady);
+  const normalizedActionError =
+    typeof actionError === "string" ? ({ message: actionError } as ApiError) : actionError;
 
   async function handlePledge(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,43 +157,6 @@ export function CampaignDetailPanel({
         </article>
       </div>
 
-      <div className="wallet-status">
-        <div>
-          <h3 className="wallet-status-title">Freighter pledge flow</h3>
-          <p className="muted">
-            Simulate, sign, and submit the Soroban pledge from the contributor
-            wallet.
-          </p>
-        </div>
-        {connectedWallet ? (
-          <div className="wallet-connected">
-            <span className="badge badge-funded">Connected</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span className="mono">{connectedWallet}</span>
-              <CopyButton
-                value={connectedWallet}
-                ariaLabel="Copy connected wallet address"
-              />
-            </div>
-          </div>
-        ) : (
-          <button
-            className="btn-secondary"
-            type="button"
-            disabled={isConnectingWallet || !walletReady}
-            onClick={onConnectWallet}
-          >
-            <Wallet size={18} />
-            {isConnectingWallet ? "Connecting..." : "Connect Freighter"}
-          </button>
-        )}
-      </div>
-
-      <p className="muted">
-        {walletReady
-          ? `Contract ${appConfig?.contractId ?? ""} on ${networkName(appConfig)}.`
-          : "Wallet signing is not configured yet. Set CONTRACT_ID and SOROBAN_RPC_URL on the backend first."}
-      </p>
 
       <ContributorSummary
         pledges={activeCampaign.pledges}
@@ -275,7 +233,7 @@ export function CampaignDetailPanel({
             disabled={
               isSubmitting ||
               !activeCampaign.progress.canRefund ||
-              refundContributor.trim().length === 0
+              contributor.trim().length === 0
             }
             onClick={handleRefund}
           >
@@ -290,25 +248,13 @@ export function CampaignDetailPanel({
           refresh after the Soroban transaction confirms.
         </p>
       ) : null}
-
-      {actionError && (
+      {normalizedActionError ? (
         <div className="form-error">
-          <p>{actionError.message}</p>
-          {actionError.details && actionError.details.length > 0 ? (
-            <ul className="error-details">
-              {actionError.details.map((detail, index) => (
-                <li key={`${detail.field}-${index}`}>
-                  <strong>{detail.field}:</strong> {detail.message}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {actionError.code ? (
+          <p>{normalizedActionError.message}</p>
+          {normalizedActionError.code && (
             <small className="error-meta">
-              Code: {actionError.code}
-              {actionError.requestId
-                ? ` | Request ID: ${actionError.requestId}`
-                : ""}
+              Code: {normalizedActionError.code}
+              {normalizedActionError.requestId && ` | Request ID: ${normalizedActionError.requestId}`}
             </small>
           ) : null}
         </div>

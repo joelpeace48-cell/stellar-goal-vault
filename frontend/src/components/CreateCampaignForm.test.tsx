@@ -1,12 +1,6 @@
-/// <reference types="vitest/globals" />
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateCampaignForm } from "./CreateCampaignForm";
-import { ApiError } from "../types/campaign";
-
-function makeApiError(message: string): ApiError {
-  return { message };
-}
 
 describe("CreateCampaignForm", () => {
   it("renders all required fields", () => {
@@ -26,7 +20,7 @@ describe("CreateCampaignForm", () => {
     render(
       <CreateCampaignForm
         onCreate={async () => {}}
-        apiError={makeApiError("Something went wrong")}
+        apiError={{ message: "Something went wrong" }}
       />,
     );
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
