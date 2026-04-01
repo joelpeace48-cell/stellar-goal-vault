@@ -43,23 +43,7 @@ function setCampaignIdInUrl(campaignId: string | null): void {
   window.history.replaceState(null, "", url.toString());
 }
 
-function toApiError(error: unknown): ApiError {
-  if (error instanceof Error) {
-    const withMetadata = error as Error & {
-      code?: string;
-      details?: Array<{ field: string; message: string }>;
-      requestId?: string;
-    };
 
-    return {
-      message: withMetadata.message,
-      code: withMetadata.code,
-      details: withMetadata.details,
-      requestId: withMetadata.requestId,
-    };
-  }
-
-  return { message: "Unexpected error" };
 }
 
 function toOptimisticPledgedCampaign(campaign: Campaign, amount: number): Campaign {
@@ -106,11 +90,7 @@ function App() {
   const [isIssuesLoading, setIsIssuesLoading] = useState(false);
   const [isSelectedLoading, setIsSelectedLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
-    null,
-  );
-  const [selectedCampaignDetails, setSelectedCampaignDetails] =
-    useState<Campaign | null>(null);
+
   const [createError, setCreateError] = useState<ApiError | null>(null);
   const [actionError, setActionError] = useState<ApiError | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -146,6 +126,11 @@ function App() {
       }
 
       setSelectedCampaignId(exists ? candidateId : data[0]?.id ?? null);
+    } catch (error) {
+      console.error("Failed to refresh campaigns:", error);
+      setActionError(
+        error instanceof Error ? { message: error.message } : { message: "Failed to load campaigns" }
+      );
     } finally {
       const elapsed = Date.now() - startedAt;
       const minMs = 300;
@@ -162,8 +147,7 @@ function App() {
       return;
     }
 
-    const data = await getCampaignHistory(campaignId);
-    setHistory([...data].reverse());
+
   }
 
   async function refreshSelectedCampaign(campaignId: string | null) {
@@ -177,6 +161,11 @@ function App() {
     try {
       const campaign = await getCampaign(campaignId);
       setSelectedCampaignDetails(campaign);
+    } catch (error) {
+      console.error("Failed to load campaign details:", error);
+      setActionError(
+        error instanceof Error ? { message: error.message } : { message: "Failed to load campaign details" }
+      );
     } finally {
       const elapsed = Date.now() - startedAt;
       const minMs = 200;
@@ -191,22 +180,7 @@ function App() {
   // made everything below it fall outside the component's scope.
   useEffect(() => {
     async function bootstrap() {
-      setInitialLoad(true);
-      setActionError(null);
 
-      const urlCampaignId = getCampaignIdFromUrl();
-
-      try {
-        setIsIssuesLoading(true);
-        const [fetchedIssues] = await Promise.all([
-          listOpenIssues(),
-          refreshCampaigns(urlCampaignId),
-        ]);
-        setIssues(fetchedIssues);
-      } catch (error) {
-        setActionError(toApiError(error));
-      } finally {
-        setIsIssuesLoading(false);
         setInitialLoad(false);
       }
     }
@@ -219,9 +193,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (initialLoad) {
-      return;
-    }
 
     setSelectedCampaignDetails(null);
     void Promise.all([
@@ -278,7 +249,7 @@ function App() {
         `Campaign #${campaign.id} is live and ready for pledges.`,
       );
     } catch (error) {
-      setCreateError(toApiError(error));
+
     }
   }
 
@@ -394,7 +365,7 @@ function App() {
         setHistory(previousHistory);
       }
 
-      setPendingPledgeCampaignId(null);
+
       setActionMessage(null);
       setActionError(toApiError(error));
     }
@@ -451,7 +422,7 @@ function App() {
       ]);
       setActionMessage("Campaign claimed successfully.");
     } catch (error) {
-      setActionError(toApiError(error));
+
     }
   }
 
@@ -470,12 +441,6 @@ function App() {
         refreshSelectedCampaign(campaignId),
       ]);
 
-      setActionMessage(
-        `Refund confirmed on Soroban and reconciled locally (${sorobanReceipt.txHash.slice(0, 12)}...).`,
-      );
-    } catch (error) {
-      setActionMessage(null);
-      setActionError(toApiError(error));
     }
   }
 
@@ -483,6 +448,7 @@ function App() {
     setInvalidUrlCampaignId(null);
     setSelectedCampaignId(campaignId);
   }
+
 
   return (
     <div className="app-shell">
@@ -494,13 +460,7 @@ function App() {
         </p>
       </header>
 
-      {invalidUrlCampaignId ? (
-        <div className="form-error" style={{ marginBottom: 16 }}>
-          <p>Campaign #{invalidUrlCampaignId} was not found. Showing the next available campaign instead.</p>
-        </div>
-      ) : null}
 
-      <section className="metrics-grid animate-fade-in">
         <article className="metric-card">
           <span>Total campaigns</span>
           <strong>{metrics.total}</strong>
@@ -544,21 +504,7 @@ function App() {
         />
       </section>
 
-      <section className="layout-grid animate-fade-in" style={{ animationDelay: "0.3s" }}>
-        <CampaignsTable
-          campaigns={campaigns}
-          selectedCampaignId={selectedCampaignId}
-          onSelect={handleSelect}
-          isLoading={isCampaignsLoading}
-        />
-        <CampaignTimeline
-          history={history}
-          isLoading={(isSelectedLoading && !!selectedCampaignId) || initialLoad}
-        />
-      </section>
 
-      <section className="animate-fade-in" style={{ animationDelay: "0.4s" }}>
-        <IssueBacklog issues={issues} isLoading={isIssuesLoading} />
       </section>
     </div>
   );

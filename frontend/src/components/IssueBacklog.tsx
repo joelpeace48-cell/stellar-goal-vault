@@ -40,23 +40,7 @@ export function IssueBacklog({ issues, isLoading }: IssueBacklogProps) {
       </div>
 
       <div className="issue-list">
-        {issues.map((issue) => (
-          <article key={issue.id} className="issue-item">
-            <div className="issue-topline">
-              <strong>{issue.title}</strong>
-              <span className="badge badge-neutral">{issue.points} pts</span>
-            </div>
-            <p>{issue.summary}</p>
-            <div className="chip-row">
-              {issue.labels.map((label) => (
-                <span key={label} className="chip">
-                  {label}
-                </span>
-              ))}
-              <span className="chip-emphasis">{issue.complexity}</span>
-            </div>
-          </article>
-        ))}
+
       </div>
     </section>
   );

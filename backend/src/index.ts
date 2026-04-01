@@ -49,7 +49,7 @@ type CampaignListItem =
   ? ReturnType<typeof listCampaigns>[number] & { progress: Progress }
   : never;
 
-initCampaignStore();
+<
 
 app.use(
   cors({

@@ -1,11 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ContributorSummary } from "./ContributorSummary";
-import { EmptyState } from "./EmptyState";
+
 
 interface CampaignDetailPanelProps {
   campaign: Campaign | null;
   isLoading?: boolean;
-  actionError?: ApiError | string | null;
+
   actionMessage?: string | null;
   isPledgePending?: boolean;
   onConnectWallet: () => Promise<void>;

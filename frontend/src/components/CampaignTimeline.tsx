@@ -117,7 +117,7 @@ export function CampaignTimeline({ history, isLoading }: CampaignTimelineProps) 
           const isPending = event.metadata?.pending === true;
           const metadataLines = getMetadataLines(event);
 
-          return (
+
             <article key={event.id} className={`timeline-item ${isPending ? "pending" : ""}`}>
               <div className="timeline-dot" aria-hidden />
               <div className="timeline-copy">

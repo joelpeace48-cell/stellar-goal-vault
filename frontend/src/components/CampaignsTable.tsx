@@ -8,12 +8,19 @@ import { SearchInput } from "./SearchInput";
 import { applyFilters, getDistinctAssetCodes, sortCampaigns } from "./campaignsTableUtils";
 import { useDebounce } from "../hooks/useDebounce";
 
+import { useMemo, useState } from "react";
+import { LayoutGrid } from "lucide-react";
+
+import { Campaign } from "../types/campaign";
+import { EmptyState } from "./EmptyState";
+import { AssetFilterDropdown } from "./AssetFilterDropdown";
+
 interface CampaignsTableProps {
   campaigns: Campaign[];
   selectedCampaignId: string | null;
   onSelect: (campaignId: string) => void;
   isLoading?: boolean;
-  invalidUrlCampaignId?: string | null;
+
 }
 
 function formatTimestamp(unixSeconds: number): string {
@@ -26,23 +33,7 @@ export function CampaignsTable({
   campaigns,
   selectedCampaignId,
   onSelect,
-  invalidUrlCampaignId,
-  isLoading = false,
-}: CampaignsTableProps) {
-  const [selectedAssetCode, setSelectedAssetCode] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
-  const debouncedSearchQuery = useDebounce(searchInput, 300);
-  const distinctAssetCodes = useMemo(() => getDistinctAssetCodes(campaigns), [campaigns]);
-  const filteredCampaigns = useMemo(
-    () => applyFilters(campaigns, selectedAssetCode, "", debouncedSearchQuery),
-    [campaigns, selectedAssetCode, debouncedSearchQuery],
-  );
-  const sortedCampaigns = useMemo(
-    () => sortCampaigns(filteredCampaigns, sortBy),
-    [filteredCampaigns, sortBy],
-  );
-  const isEmpty = campaigns.length === 0;
+
 
   if (isLoading && isEmpty) {
     return (
@@ -83,26 +74,7 @@ export function CampaignsTable({
       )}
 
       <div className="board-controls">
-        <SearchInput
-          value={searchInput}
-          onChange={setSearchInput}
-          disabled={campaigns.length === 0}
-          placeholder="Search by title, creator, or ID..."
-        />
-        <AssetFilterDropdown
-          options={distinctAssetCodes}
-          value={selectedAssetCode}
-          onChange={setSelectedAssetCode}
-          disabled={false}
-        />
-        <SortDropdown
-          value={sortBy}
-          onChange={setSortBy}
-          disabled={campaigns.length === 0}
-        />
-      </div>
 
-      {sortedCampaigns.length === 0 ? (
         <p className="muted">No campaigns match the current filters.</p>
       ) : (
         <div className="table-wrap">
@@ -118,7 +90,7 @@ export function CampaignsTable({
               </tr>
             </thead>
             <tbody>
-              {sortedCampaigns.map((campaign) => (
+
                 <tr key={campaign.id}>
                   <td>
                     <div className="stacked">
