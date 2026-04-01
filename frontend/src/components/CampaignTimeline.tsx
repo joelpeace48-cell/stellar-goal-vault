@@ -4,11 +4,18 @@ import { EmptyState } from "./EmptyState";
 
 interface CampaignTimelineProps {
   history: CampaignEvent[];
-  isLoading?: boolean;
 }
 
 function formatTimestamp(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleString();
+}
+
+function truncate(value: string, start = 10, end = 8): string {
+  if (value.length <= start + end + 1) {
+    return value;
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
 }
 
 function describeEvent(event: CampaignEvent): string {
@@ -26,39 +33,91 @@ function describeEvent(event: CampaignEvent): string {
   }
 }
 
+function getMetadataLines(event: CampaignEvent): string[] {
+  const metadata = event.metadata ?? {};
+  const lines: string[] = [];
+
+  if (event.actor) {
+    lines.push(`Actor: ${truncate(event.actor)}`);
+  }
+
+  if (typeof event.amount === "number") {
+    lines.push(`Amount: ${event.amount}`);
+  }
+
+  if (typeof metadata.refundedPledgeCount === "number") {
+    lines.push(`Refunded pledges: ${metadata.refundedPledgeCount}`);
+  }
+
+  if (typeof metadata.txHash === "string") {
+    lines.push(`Tx: ${truncate(metadata.txHash, 12, 10)}`);
+  }
+
+  if (typeof metadata.walletAddress === "string") {
+    lines.push(`Wallet: ${truncate(metadata.walletAddress)}`);
+  }
+
+  if (typeof metadata.refundSource === "string") {
+    lines.push(`Source: ${String(metadata.refundSource)}`);
+  }
+
+  if (typeof metadata.contractId === "string") {
+    lines.push(`Contract: ${truncate(metadata.contractId, 12, 10)}`);
+  }
+
+  if (typeof metadata.rpcUrl === "string") {
+    lines.push(`RPC: ${String(metadata.rpcUrl)}`);
+  }
+
+  if (typeof metadata.ledger === "number") {
+    lines.push(`Ledger: ${metadata.ledger}`);
+  }
+
+  if (typeof metadata.latestLedger === "number") {
+    lines.push(`Latest ledger seen: ${metadata.latestLedger}`);
+  }
+
+  return lines;
+}
+
 export function CampaignTimeline({ history, isLoading }: CampaignTimelineProps) {
+  if (isLoading) {
+    return (
+      <section className="card">
+        <div className="section-heading">
+          <h2>Timeline</h2>
+          <p className="muted">Loading campaign activity...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <EmptyState
+        variant="card"
+        icon={History}
+        title="Timeline"
+        message="No campaign activity yet. New Soroban and local events will appear here."
+      />
+    );
+  }
+
   return (
     <section className="card">
       <div className="section-heading">
         <h2>Timeline</h2>
-        <p className="muted">Each action is stored locally so contributors can follow campaign activity.</p>
+        <p className="muted">
+          Local history is reconciled after successful contract actions so contributors can inspect refund metadata.
+        </p>
       </div>
 
+      <div className="timeline">
+        {history.map((event) => {
+          const isPending = event.metadata?.pending === true;
+          const metadataLines = getMetadataLines(event);
 
-      {isLoading ? (
-        <div className="timeline">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <article key={idx} className="timeline-item">
-              <div className="timeline-dot" aria-hidden />
-              <div className="timeline-copy">
-                <div className="skeleton skeleton-line" style={{ width: 160 }} />
-                <div className="skeleton skeleton-line" style={{ width: 100, height: 12 }} />
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : history.length === 0 ? (
-        <EmptyState
-          variant="inline"
-          icon={History}
-          title="No activity yet"
-          message="Select a campaign to see lifecycle events."
-        />
-      ) : (
-        <div className="timeline">
-          {history.map((event) => {
-            const isPending = event.metadata?.pending === true;
-            return (
+
             <article key={event.id} className={`timeline-item ${isPending ? "pending" : ""}`}>
               <div className="timeline-dot" aria-hidden />
               <div className="timeline-copy">
@@ -67,16 +126,20 @@ export function CampaignTimeline({ history, isLoading }: CampaignTimelineProps) 
                   {isPending ? " (pending...)" : ""}
                 </strong>
                 <span className="muted">{formatTimestamp(event.timestamp)}</span>
-                <span className="muted">
-                  {event.actor ? `Actor: ${event.actor.slice(0, 10)}...` : "System event"}
-                  {typeof event.amount === "number" ? ` | Amount: ${event.amount}` : ""}
-                </span>
+                {metadataLines.length > 0 ? (
+                  metadataLines.map((line) => (
+                    <span key={`${event.id}-${line}`} className="muted">
+                      {line}
+                    </span>
+                  ))
+                ) : (
+                  <span className="muted">System event</span>
+                )}
               </div>
             </article>
-            );
-          })}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </section>
   );
 }

@@ -1,39 +1,56 @@
 import { FormEvent, useEffect, useState } from "react";
-import { MousePointer2 } from "lucide-react";
 
-import { ContributorSummary } from "./ContributorSummary";
-import { EmptyState } from "./EmptyState";
-import { Campaign, ApiError } from "../types/campaign";
 
 interface CampaignDetailPanelProps {
   campaign: Campaign | null;
   isLoading?: boolean;
-  actionError?: ApiError | null;
+
   actionMessage?: string | null;
   isPledgePending?: boolean;
-  onPledge: (campaignId: string, contributor: string, amount: number) => Promise<void>;
+  onConnectWallet: () => Promise<void>;
+  onPledge: (campaignId: string, amount: number) => Promise<void>;
   onClaim: (campaign: Campaign) => Promise<void>;
   onRefund: (campaignId: string, contributor: string) => Promise<void>;
 }
 
+function networkName(config: AppConfig | null): string {
+  if (!config) {
+    return "network";
+  }
+  if (config.networkPassphrase === "Test SDF Network ; September 2015") {
+    return "Stellar Testnet";
+  }
+  if (
+    config.networkPassphrase ===
+    "Public Global Stellar Network ; September 2015"
+  ) {
+    return "Stellar Mainnet";
+  }
+  return "Configured network";
+}
+
 export function CampaignDetailPanel({
   campaign,
-  isLoading,
+  appConfig,
+  connectedWallet,
+  isConnectingWallet = false,
+  isLoading = false,
   actionError,
   actionMessage,
   isPledgePending = false,
+  onConnectWallet,
   onPledge,
   onClaim,
   onRefund,
 }: CampaignDetailPanelProps) {
-  const [contributor, setContributor] = useState("");
-  const [amount, setAmount] = useState("25");
+  const [pledgeAmount, setPledgeAmount] = useState("25");
+  const [refundContributor, setRefundContributor] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setContributor("");
-    setAmount("25");
-  }, [campaign?.id]);
+    setPledgeAmount("25");
+    setRefundContributor(connectedWallet ?? "");
+  }, [campaign?.id, connectedWallet]);
 
   if (isLoading) {
     return (
@@ -42,21 +59,22 @@ export function CampaignDetailPanel({
           <h2>
             <div className="skeleton skeleton-line" style={{ width: 220 }} />
           </h2>
-          <p className="muted">
-            <div className="skeleton skeleton-line" style={{ width: 320, height: 14 }} />
-          </p>
+          <div
+            className="skeleton skeleton-line"
+            style={{ width: 320, height: 14 }}
+          />
         </div>
-
         <div className="detail-grid">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <article key={i} className="detail-stat">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <article key={index} className="detail-stat">
               <div className="skeleton skeleton-line" style={{ width: 120 }} />
-              <div className="skeleton skeleton-line" style={{ width: 80, height: 18, marginTop: 8 }} />
+              <div
+                className="skeleton skeleton-line"
+                style={{ width: 80, height: 18, marginTop: 8 }}
+              />
             </article>
           ))}
         </div>
-
-        <div className="skeleton" style={{ height: 120, borderRadius: 12 }} />
       </section>
     );
   }
@@ -66,19 +84,21 @@ export function CampaignDetailPanel({
       <EmptyState
         variant="card"
         icon={MousePointer2}
+        title="Campaign actions"
         message="Pick a campaign from the board to manage it."
       />
     );
   }
 
   const activeCampaign = campaign;
+  const normalizedActionError =
+    typeof actionError === "string" ? ({ message: actionError } as ApiError) : actionError;
 
   async function handlePledge(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     try {
-      await onPledge(activeCampaign.id, contributor.trim(), Number(amount));
-      setAmount("25");
+      await onPledge(activeCampaign.id, Number(pledgeAmount));
     } finally {
       setIsSubmitting(false);
     }
@@ -87,7 +107,7 @@ export function CampaignDetailPanel({
   async function handleRefund() {
     setIsSubmitting(true);
     try {
-      await onRefund(activeCampaign.id, contributor.trim());
+      await onRefund(activeCampaign.id, refundContributor.trim());
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +132,15 @@ export function CampaignDetailPanel({
       <div className="detail-grid">
         <article className="detail-stat">
           <span>Creator</span>
-          <strong className="mono">{activeCampaign.creator.slice(0, 16)}...</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <strong className="mono">
+              {activeCampaign.creator.slice(0, 16)}...
+            </strong>
+            <CopyButton
+              value={activeCampaign.creator}
+              ariaLabel="Copy creator address"
+            />
+          </div>
         </article>
         <article className="detail-stat">
           <span>Asset</span>
@@ -128,17 +156,21 @@ export function CampaignDetailPanel({
         </article>
       </div>
 
-  <ContributorSummary pledges={activeCampaign.pledges} assetCode={activeCampaign.assetCode} isLoading={isLoading} />
+
+      <ContributorSummary
+        pledges={activeCampaign.pledges}
+        assetCode={activeCampaign.assetCode}
+        isLoading={isLoading}
+      />
 
       <form className="form-grid" onSubmit={handlePledge}>
         <label className="field-group">
-          <span>Contributor account</span>
+          <span>Connected contributor</span>
           <input
             type="text"
-            value={contributor}
-            onChange={(event) => setContributor(event.target.value)}
-            placeholder="G... contributor public key"
-            required
+            value={connectedWallet ?? ""}
+            placeholder="Connect Freighter to use the pledge flow"
+            readOnly
           />
         </label>
 
@@ -148,8 +180,8 @@ export function CampaignDetailPanel({
             type="number"
             min="0.01"
             step="0.01"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            value={pledgeAmount}
+            onChange={(event) => setPledgeAmount(event.target.value)}
             required
           />
         </label>
@@ -158,10 +190,19 @@ export function CampaignDetailPanel({
           <button
             className="btn-primary"
             type="submit"
-            disabled={isSubmitting || !activeCampaign.progress.canPledge}
+            disabled={
+              isSubmitting ||
+              isPledgePending ||
+              !activeCampaign.progress.canPledge ||
+              !connectedWallet ||
+              !walletReady
+            }
           >
-            {isPledgePending ? "Submitting..." : "Add pledge"}
+            {isPledgePending
+              ? "Simulating / waiting..."
+              : "Sign pledge with Freighter"}
           </button>
+
           <button
             className="btn-ghost"
             type="button"
@@ -170,34 +211,57 @@ export function CampaignDetailPanel({
           >
             Claim vault
           </button>
+        </div>
+      </form>
+
+      <div className="form-grid" style={{ marginTop: 16 }}>
+        <label className="field-group">
+          <span>Refund contributor</span>
+          <input
+            type="text"
+            value={refundContributor}
+            onChange={(event) => setRefundContributor(event.target.value)}
+            placeholder="G... contributor public key"
+          />
+        </label>
+
+        <div className="action-row">
           <button
             className="btn-ghost"
             type="button"
-            disabled={isSubmitting || !activeCampaign.progress.canRefund || contributor.trim().length === 0}
+            disabled={
+              isSubmitting ||
+              !activeCampaign.progress.canRefund ||
+              contributor.trim().length === 0
+            }
             onClick={handleRefund}
           >
             Refund contributor
           </button>
         </div>
-      </form>
+      </div>
 
       {isPledgePending ? (
-        <p className="pending-note">Pledge is pending confirmation and will reconcile automatically.</p>
+        <p className="pending-note">
+          The pledge transaction is in flight. The local campaign state will
+          refresh after the Soroban transaction confirms.
+        </p>
       ) : null}
-      {actionError ? (
+      {normalizedActionError ? (
         <div className="form-error">
-          <p>{actionError.message}</p>
-          {actionError.code && (
+          <p>{normalizedActionError.message}</p>
+          {normalizedActionError.code && (
             <small className="error-meta">
-              Code: {actionError.code}
-              {actionError.requestId && ` | Request ID: ${actionError.requestId}`}
+              Code: {normalizedActionError.code}
+              {normalizedActionError.requestId && ` | Request ID: ${normalizedActionError.requestId}`}
             </small>
-          )}
+          ) : null}
         </div>
-      ) : null}
-      {actionMessage ? <p className="form-success">{actionMessage}</p> : null}
+      )}
 
-      {activeCampaign.metadata?.imageUrl && (
+      {actionMessage && <p className="form-success">{actionMessage}</p>}
+
+      {activeCampaign.metadata?.imageUrl ? (
         <div className="campaign-image-container">
           <img
             src={activeCampaign.metadata.imageUrl}
@@ -205,9 +269,9 @@ export function CampaignDetailPanel({
             className="campaign-image"
           />
         </div>
-      )}
+      ) : null}
 
-      {activeCampaign.metadata?.externalLink && (
+      {activeCampaign.metadata?.externalLink ? (
         <div className="external-link-container">
           <a
             href={activeCampaign.metadata.externalLink}
@@ -215,10 +279,10 @@ export function CampaignDetailPanel({
             rel="noopener noreferrer"
             className="btn-ghost"
           >
-            Visit Project Website
+            Visit project website
           </a>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
