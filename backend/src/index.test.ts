@@ -16,6 +16,7 @@ let parseCampaignListFilters: IndexModule["parseCampaignListFilters"];
 let createCampaign: CampaignStoreModule["createCampaign"];
 let addPledge: CampaignStoreModule["addPledge"];
 let calculateProgress: CampaignStoreModule["calculateProgress"];
+let initCampaignStore: CampaignStoreModule["initCampaignStore"];
 let getDb: DbModule["getDb"];
 
 const CREATOR = `G${"A".repeat(55)}`;
@@ -24,7 +25,10 @@ const CONTRIBUTOR = `G${"B".repeat(55)}`;
 beforeAll(async () => {
   fs.rmSync(TEST_DB_PATH, { force: true });
   ({ parseCampaignListFilters } = await import("./index"));
-  ({ listCampaigns, createCampaign, addPledge, calculateProgress } = await import("./services/campaignStore"));
+  ({ listCampaigns, createCampaign, addPledge, calculateProgress, initCampaignStore } = await import(
+    "./services/campaignStore",
+  ));
+  initCampaignStore();
   ({ getDb } = await import("./services/db"));
 }, 20000);
 
@@ -175,5 +179,8 @@ describe("campaign list filters and pagination", () => {
     expect(filtered[0].assetCode).toBe("USDC");
   });
 });
+
+
+
 
 

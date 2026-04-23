@@ -15,6 +15,7 @@ type DbModule = typeof import("./db");
 type EventHistoryModule = typeof import("./eventHistory");
 
 let createCampaign: CampaignStoreModule["createCampaign"];
+let calculateProgress: CampaignStoreModule["calculateProgress"];
 let initCampaignStore: CampaignStoreModule["initCampaignStore"];
 let listCampaigns: CampaignStoreModule["listCampaigns"];
 let reconcileOnChainPledge: CampaignStoreModule["reconcileOnChainPledge"];
@@ -32,6 +33,7 @@ beforeAll(async () => {
 
   ({
     createCampaign,
+    calculateProgress,
     initCampaignStore,
     listCampaigns,
     reconcileOnChainPledge,
@@ -158,3 +160,207 @@ describe("on-chain pledge reconciliation", () => {
     ).toHaveLength(1);
   });
 });
+
+const DEADLINE = 1_000_000;
+const T = 100;
+
+/**
+ * Create a USDC campaign with the given `target`, then set numeric fields so
+ * `calculateProgress` can be called with a controlled `at` and matching DB `pledgeCount`.
+ */
+function putCampaign(
+  c: { pledgedAmount: number; deadline: number; targetAmount: number; claimedAt: number | null },
+) {
+  const base = createCampaign({
+    creator: CREATOR,
+    title: "Progress campaign",
+    description: "Unit test for calculateProgress.",
+    assetCode: "USDC",
+    targetAmount: c.targetAmount,
+    deadline: c.deadline,
+  });
+  getDb()
+    .prepare(
+      `UPDATE campaigns SET pledged_amount = ?, deadline = ?, claimed_at = ? WHERE id = ?`,
+    )
+    .run(c.pledgedAmount, c.deadline, c.claimedAt, base.id);
+  return getCampaign(base.id)!;
+}
+
+describe("calculateProgress", () => {
+  it("open, underfunded, before deadline: canPledge only", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 40,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE - 3600);
+    expect(p.status).toBe("open");
+    expect(p.canPledge).toBe(true);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("open: 1s before exact deadline, still not reached", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 50,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE - 1);
+    expect(p.status).toBe("open");
+    expect(p.canPledge).toBe(true);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("failed: at exact deadline, underfunded — canRefund only", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 50,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE);
+    expect(p.status).toBe("failed");
+    expect(p.canPledge).toBe(false);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(true);
+  });
+
+  it("failed: after deadline, underfunded", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 0,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE + 10);
+    expect(p.status).toBe("failed");
+    expect(p.canPledge).toBe(false);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(true);
+  });
+
+  it("funded: pledged equals target before deadline — status funded, canPledge, not claim or refund", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: T,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE - 100);
+    expect(p.status).toBe("funded");
+    expect(p.canPledge).toBe(true);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("funded: exact target at exact deadline — canClaim, not pledge or refund", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: T,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE);
+    expect(p.status).toBe("funded");
+    expect(p.canPledge).toBe(false);
+    expect(p.canClaim).toBe(true);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("funded: over target after deadline, unclaimed — canClaim", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 150,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE + 1);
+    expect(p.status).toBe("funded");
+    expect(p.canPledge).toBe(false);
+    expect(p.canClaim).toBe(true);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("claimed: all actions false regardless of time and funds", () => {
+    const claimedAt = DEADLINE - 5000;
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: T,
+      deadline: DEADLINE,
+      claimedAt,
+    });
+    const p = calculateProgress(campaign, DEADLINE);
+    expect(p.status).toBe("claimed");
+    expect(p.canPledge).toBe(false);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("claimed: still claimed when underfunded (edge: bad data)", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 20,
+      deadline: DEADLINE,
+      claimedAt: DEADLINE - 1,
+    });
+    const p = calculateProgress(campaign, DEADLINE + 100);
+    expect(p.status).toBe("claimed");
+    expect(p.canPledge).toBe(false);
+    expect(p.canClaim).toBe(false);
+    expect(p.canRefund).toBe(false);
+  });
+
+  it("at exact deadline, one below target: failed, not claim", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 99.99,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE);
+    expect(p.status).toBe("failed");
+    expect(p.canRefund).toBe(true);
+    expect(p.canClaim).toBe(false);
+  });
+
+  it("exposes percentFunded, remainingAmount, and hoursLeft for open", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 25,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const p = calculateProgress(campaign, DEADLINE - 7200);
+    expect(p.percentFunded).toBe(25);
+    expect(p.remainingAmount).toBe(75);
+    expect(p.hoursLeft).toBe(2);
+  });
+
+  it("pledgeCount includes active pledges, excludes refunded", () => {
+    const campaign = putCampaign({
+      targetAmount: T,
+      pledgedAmount: 0,
+      deadline: DEADLINE,
+      claimedAt: null,
+    });
+    const db = getDb();
+    const t = 10;
+    db.prepare(
+      `INSERT INTO pledges (campaign_id, contributor, amount, created_at, refunded_at, transaction_hash)
+       VALUES (?, ?, ?, ?, NULL, NULL)`,
+    ).run(campaign.id, CONTRIBUTOR, 1, t);
+    db.prepare(
+      `INSERT INTO pledges (campaign_id, contributor, amount, created_at, refunded_at, transaction_hash)
+       VALUES (?, ?, ?, ?, ?, NULL)`,
+    ).run(campaign.id, CONTRIBUTOR, 1, t + 1, t);
+    const c = getCampaign(campaign.id)!;
+    const p = calculateProgress(c, DEADLINE - 1);
+    expect(p.pledgeCount).toBe(1);
+  });
+});
+
