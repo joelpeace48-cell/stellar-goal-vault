@@ -5,6 +5,8 @@ use soroban_sdk::{
     String,
 };
 
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Campaign {
@@ -20,6 +22,7 @@ pub struct Campaign {
 #[contracttype]
 pub enum DataKey {
     NextCampaignId,
+    ContractVersion,
     Campaign(u64),
     Contribution(u64, Address),
 }
@@ -253,6 +256,19 @@ impl StellarGoalVaultContract {
             .persistent()
             .get(&DataKey::NextCampaignId)
             .unwrap_or(0)
+    }
+
+    pub fn get_version(env: Env) -> String {
+        let stored_version: Option<String> = env.storage().instance().get(&DataKey::ContractVersion);
+
+        match stored_version {
+            Some(version) => version,
+            None => {
+                let version = String::from_str(&env, CONTRACT_VERSION);
+                env.storage().instance().set(&DataKey::ContractVersion, &version);
+                version
+            }
+        }
     }
 }
 

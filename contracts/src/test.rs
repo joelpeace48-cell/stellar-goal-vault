@@ -30,6 +30,27 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
+    // version: getter returns current contract version
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_get_version_returns_semver() {
+        let env = Env::default();
+        let client = deploy_contract(&env);
+
+        let version = client.get_version();
+        assert_eq!(version, String::from_str(&env, env!("CARGO_PKG_VERSION")));
+
+        let parts: Vec<&str> = env!("CARGO_PKG_VERSION").split('.').collect();
+        assert_eq!(parts.len(), 3, "version should have major.minor.patch");
+        assert!(
+            parts
+                .iter()
+                .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit())),
+            "version segments should be numeric"
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // claim: success path
     // -------------------------------------------------------------------------
     #[test]
