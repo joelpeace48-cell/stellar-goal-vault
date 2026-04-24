@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+
 import { CampaignDetailPanel } from "./components/CampaignDetailPanel";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
 import { CampaignsTable } from "./components/CampaignsTable";
@@ -34,6 +34,8 @@ import {
 } from "./types/campaign";
 
 const DEFAULT_NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
+const THEME_STORAGE_KEY = "stellar-goal-vault-theme";
+type ThemeMode = "light" | "dark";
 
 function round(value: number): number {
   return Number(value.toFixed(2));
@@ -88,6 +90,15 @@ function toApiError(error: unknown): ApiError {
   return { message: "Something went wrong." };
 }
 
+function getInitialThemeMode(): ThemeMode {
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function App() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [issues, setIssues] = useState<OpenIssue[]>([]);
@@ -110,45 +121,7 @@ function App() {
   const [invalidUrlCampaignId, setInvalidUrlCampaignId] = useState<string | null>(null);
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [isConnectingWallet, setIsConnectingWallet] = useState(false);
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
-  const toggleShortcuts = useCallback(() => {
-    setIsShortcutsOpen((prev) => !prev);
-  }, []);
-
-  const closeShortcuts = useCallback(() => {
-    setIsShortcutsOpen(false);
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts if user is typing in an input/textarea
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
-
-      if (e.key === "?") {
-        toggleShortcuts();
-      } else if (e.key === "Escape") {
-        closeShortcuts();
-      } else if (e.key === "c") {
-        document.querySelector<HTMLInputElement>('input[name="title"]')?.focus();
-      } else if (e.key === "w") {
-        handleConnectWallet();
-      } else if (e.key === "s") {
-        document.querySelector<HTMLInputElement>('.search-input-field')?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleShortcuts, closeShortcuts]);
-
-  const { toasts, addToast, dismiss } = useToast();
 
   useEffect(() => {
     setCampaignIdInUrl(selectedCampaignId);
@@ -455,10 +428,25 @@ function handleSelect(campaignId: string) {
   setSelectedCampaignId(campaignId);
 }
 
+  function handleThemeToggle() {
+    setThemeMode((current) => (current === "dark" ? "light" : "dark"));
+  }
+
   return (
     <div className="app-shell">
       <header className="hero">
-        <p className="eyebrow">Soroban crowdfunding MVP</p>
+        <div className="hero-topline">
+          <p className="eyebrow">Soroban crowdfunding MVP</p>
+          <button
+            type="button"
+            className="btn-ghost theme-toggle"
+            onClick={handleThemeToggle}
+            aria-label={`Switch to ${themeMode === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${themeMode === "dark" ? "light" : "dark"} mode`}
+          >
+            {themeMode === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
         <h1>Stellar Goal Vault</h1>
         <p className="hero-copy">
           Create funding goals, collect pledges, and reconcile claim and refund flows
