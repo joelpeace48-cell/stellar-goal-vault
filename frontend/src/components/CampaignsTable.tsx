@@ -7,6 +7,7 @@ import { AssetFilterDropdown } from "./AssetFilterDropdown";
 import { applyFilters, getDistinctAssetCodes, sortCampaigns } from "./campaignsTableUtils";
 import { SearchInput } from "./SearchInput";
 import { SortDropdown, SortOption } from "./SortDropdown";
+import { AddressAvatar } from "./AddressAvatar";
 
 interface CampaignsTableProps {
   campaigns: Campaign[];
@@ -162,7 +163,12 @@ export function CampaignsTable({
                         <span className="muted">#{campaign.id}</span>
                       </div>
                     </td>
-                    <td className="mono">{campaign.creator.slice(0, 12)}...</td>
+                    <td className="mono">
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <AddressAvatar address={campaign.creator} size={28} />
+                        <span>{campaign.creator.slice(0, 12)}...</span>
+                      </div>
+                    </td>
                     <td>
                       <div className="progress-copy">
                         {campaign.pledgedAmount} / {campaign.targetAmount} {campaign.assetCode}
@@ -219,9 +225,18 @@ export function CampaignsTable({
                       {getStatusLabel(campaign.progress.status)}
                     </span>
                   </div>
-                  <span className="campaign-creator mono">
-                    {campaign.creator.slice(0, 16)}...
-                  </span>
+                  <div
+                    className="campaign-creator mono"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <AddressAvatar address={campaign.creator} size={24} />
+                    <span>{campaign.creator.slice(0, 16)}...</span>
+                  </div>
                   <div className="campaign-progress">
                     <div className="progress-copy">
                       {campaign.pledgedAmount} / {campaign.targetAmount} {campaign.assetCode}
