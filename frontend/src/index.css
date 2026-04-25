@@ -1008,6 +1008,15 @@ tbody tr:hover td {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.address-avatar {
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+.address-avatar:hover {
+  transform: scale(1.1);
+}
+
 .wallet-status {
   display: flex;
   justify-content: space-between;

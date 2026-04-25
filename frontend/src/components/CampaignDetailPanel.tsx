@@ -4,6 +4,7 @@ import { AppConfig, Campaign } from "../types/campaign";
 import { ContributorSummary } from "./ContributorSummary";
 import { CopyButton } from "./CopyButton";
 import { EmptyState } from "./EmptyState";
+import { AddressAvatar } from "./AddressAvatar";
 
 interface CampaignDetailPanelProps {
   campaign: Campaign | null;
@@ -186,7 +187,8 @@ export function CampaignDetailPanel({
         </div>
         <div className="wallet-connected">
           {connectedWallet ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <AddressAvatar address={connectedWallet} size={28} />
               <strong className="mono">{connectedWallet.slice(0, 16)}...</strong>
               <CopyButton
                 value={connectedWallet}
@@ -210,7 +212,8 @@ export function CampaignDetailPanel({
       <div className="detail-grid">
         <article className="detail-stat">
           <span>Creator</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <AddressAvatar address={activeCampaign.creator} size={28} />
             <strong className="mono">{activeCampaign.creator.slice(0, 16)}...</strong>
             <CopyButton value={activeCampaign.creator} ariaLabel="Copy creator address" />
           </div>
