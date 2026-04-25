@@ -1203,6 +1203,10 @@ tbody tr:hover td {
   background: linear-gradient(90deg, var(--primary), #22c55e);
 }
 
+.progress-bar-fill {
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .badge,
 .chip,
 .chip-emphasis {
