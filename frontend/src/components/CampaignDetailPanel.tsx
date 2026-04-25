@@ -1,4 +1,4 @@
-
+import { FormEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import { MousePointer2 } from "lucide-react";
 import { AppConfig, Campaign } from "../types/campaign";
 import { ContributorSummary } from "./ContributorSummary";
@@ -45,9 +45,9 @@ export function CampaignDetailPanel({
   isPledgePending = false,
   onConnectWallet = async () => {},
   onPledge = async () => {},
-  onClaim?: (campaign: Campaign) => Promise<void>;
-  onSoftDelete?: (campaignId: string) => Promise<void>;
-  onRefund?: (campaignId: string, contributor: string) => Promise<void>;
+  onClaim = async () => {},
+  onSoftDelete = async () => {},
+  onRefund = async () => {},
 }: CampaignDetailPanelProps) {
   const [pledgeAmount, setPledgeAmount] = useState("25");
   const [refundContributor, setRefundContributor] = useState("");
@@ -67,6 +67,11 @@ export function CampaignDetailPanel({
     setRefundContributor(connectedWallet ?? "");
   }, [campaign?.id, connectedWallet]);
 
+  useEffect(() => {
+    if (isConfirmingPledge) {
+      confirmButtonRef.current?.focus();
+    }
+  }, [isConfirmingPledge]);
 
   const walletReady = Boolean(
     appConfig?.walletIntegrationReady ?? appConfig?.soroban?.enabled,
