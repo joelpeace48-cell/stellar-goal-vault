@@ -1,19 +1,13 @@
 #![no_std]
 
-//! Stellar Goal Vault Contract
-//!
-//! This contract manages crowdfunding campaigns.
-//! A minimum pledge amount is enforced to prevent spam and dust contributions.
-//! The minimum is defined by the `MIN_CONTRIBUTION` compile-time constant.
 
-/// The minimum contribution amount allowed.
-/// Any contribution below this amount is rejected to prevent dust contributions.
-pub const MIN_CONTRIBUTION: i128 = 100;
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, token::Client as TokenClient, Address, Env,
-    String,
+    String, Vec,
 };
+
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -24,12 +18,14 @@ pub struct Campaign {
     pub pledged_amount: i128,
     pub deadline: u64,
     pub claimed: bool,
+    pub canceled: bool,
     pub metadata: String,
 }
 
 #[contracttype]
 pub enum DataKey {
     NextCampaignId,
+    ContractVersion,
     Campaign(u64),
     Contribution(u64, Address),
 }
@@ -69,8 +65,17 @@ pub struct CampaignRefunded {
     pub amount: i128,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CampaignCanceled {
+    pub campaign_id: u64,
+    pub creator: Address,
+}
+
 #[contract]
 pub struct StellarGoalVaultContract;
+
+const MAX_CAMPAIGN_DURATION_SECONDS: u64 = 60 * 60 * 24 * 180;
 
 #[contractimpl]
 impl StellarGoalVaultContract {
@@ -90,6 +95,9 @@ impl StellarGoalVaultContract {
         if deadline <= env.ledger().timestamp() {
             panic!("deadline must be in the future");
         }
+        if deadline - env.ledger().timestamp() > MAX_CAMPAIGN_DURATION_SECONDS {
+            panic!("deadline exceeds maximum campaign duration");
+        }
 
         let mut next_id: u64 = env
             .storage()
@@ -105,6 +113,7 @@ impl StellarGoalVaultContract {
             pledged_amount: 0,
             deadline,
             claimed: false,
+            canceled: false,
             metadata: metadata.clone(),
         };
 
@@ -141,8 +150,14 @@ impl StellarGoalVaultContract {
         if campaign.claimed {
             panic!("campaign already claimed");
         }
+        if campaign.canceled {
+            panic!("campaign canceled");
+        }
         if env.ledger().timestamp() >= campaign.deadline {
             panic!("campaign deadline reached");
+        }
+        if campaign.pledged_amount + amount > campaign.target_amount {
+            panic!("campaign funding cap exceeded");
         }
 
         let token_client = TokenClient::new(&env, &campaign.token);
@@ -180,6 +195,9 @@ impl StellarGoalVaultContract {
         if campaign.claimed {
             panic!("campaign already claimed");
         }
+        if campaign.canceled {
+            panic!("campaign canceled");
+        }
         if env.ledger().timestamp() < campaign.deadline {
             panic!("campaign is still active");
         }
@@ -214,10 +232,10 @@ impl StellarGoalVaultContract {
         if campaign.claimed {
             panic!("campaign already claimed");
         }
-        if env.ledger().timestamp() < campaign.deadline {
+        if !campaign.canceled && env.ledger().timestamp() < campaign.deadline {
             panic!("campaign is still active");
         }
-        if campaign.pledged_amount >= campaign.target_amount {
+        if !campaign.canceled && campaign.pledged_amount >= campaign.target_amount {
             panic!("funded campaigns cannot be refunded");
         }
 
@@ -263,6 +281,28 @@ impl StellarGoalVaultContract {
             .persistent()
             .get(&DataKey::NextCampaignId)
             .unwrap_or(0)
+    }
+
+    /// Returns how many campaigns have been created. Uses the same counter as
+    /// [`Self::get_next_campaign_id`] ([`DataKey::NextCampaignId`]): sequential ids `1..=count`.
+    pub fn get_campaign_count(env: Env) -> u64 {
+        Self::get_next_campaign_id(env)
+    }
+
+    pub fn get_version(env: Env) -> String {
+        let stored_version: Option<String> =
+            env.storage().instance().get(&DataKey::ContractVersion);
+
+        match stored_version {
+            Some(version) => version,
+            None => {
+                let version = String::from_str(&env, CONTRACT_VERSION);
+                env.storage()
+                    .instance()
+                    .set(&DataKey::ContractVersion, &version);
+                version
+            }
+        }
     }
 }
 
