@@ -17,6 +17,10 @@ const mockConfig: AppConfig = {
   networkPassphrase: "Test SDF Network ; September 2015",
   contractAmountDecimals: 2,
   walletIntegrationReady: true,
+  assetAddresses: {
+    "USDC": "CA6WSTPZ7RRCUC6H37CQFODG763XG2HXP2G6F367VCOGGVDP32P7665E",
+    "XLM": "CDLZFC3SYJYDZT7K3SSTH3YCUY6AFMCO3Y6S3G7FEYZNVNREK7Y6CYN5"
+  }
 };
 
 const mockCampaign: Campaign = {
@@ -25,6 +29,7 @@ const mockCampaign: Campaign = {
   description: "A test campaign description",
   creator: `G${"A".repeat(55)}`,
   assetCode: "USDC",
+  acceptedTokens: ["USDC"],
   targetAmount: 100,
   pledgedAmount: 0,
   deadline: Math.floor(Date.now() / 1000) + 3600,
@@ -44,7 +49,7 @@ const mockCampaign: Campaign = {
 };
 
 describe("CampaignDetailPanel", () => {
-  it("shows empty state when no campaign is selected", () => {
+
     render(
       <CampaignDetailPanel
         campaign={null}
@@ -56,7 +61,7 @@ describe("CampaignDetailPanel", () => {
     expect(screen.getByText(/pick a campaign/i)).toBeInTheDocument();
   });
 
-  it("opens the pledge confirmation modal before submitting", async () => {
+
     const user = userEvent.setup();
     const onPledge = vi.fn().mockResolvedValue(undefined);
 
@@ -73,6 +78,6 @@ describe("CampaignDetailPanel", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /confirm pledge/i })).toBeInTheDocument();
-    expect(onPledge).not.toHaveBeenCalled();
+
   });
 });

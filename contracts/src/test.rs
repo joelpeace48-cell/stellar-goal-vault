@@ -1,11 +1,4 @@
-fix-issue---#109
-#[cfg(test)]
-mod tests {
-    use soroban_sdk::{
-        testutils::{Address as _, Ledger},
-        token::StellarAssetClient,
-        Address, Env, String,
-    };
+
 
     use crate::{StellarGoalVaultContract, StellarGoalVaultContractClient};
 

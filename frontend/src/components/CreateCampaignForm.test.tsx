@@ -142,6 +142,17 @@ describe("CreateCampaignForm", () => {
       await user.click(input);
       await user.tab();
 
+    await user.type(
+      screen.getByPlaceholderText(/G\.\.\. creator public key/i),
+      `G${"A".repeat(55)}`,
+    );
+    await user.type(screen.getByPlaceholderText(/Stellar community design sprint/i), "My Test Campaign");
+    await user.type(
+      screen.getByPlaceholderText(/Describe what the campaign funds/i),
+      "This campaign funds a real Soroban pledge flow for the MVP dashboard.",
+    );
+    await user.click(screen.getByText("USDC"));
+    await user.click(screen.getByRole("button", { name: /create campaign/i }));
       expect(screen.getByText("Campaign title is required")).toBeInTheDocument();
     });
 

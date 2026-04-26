@@ -1,4 +1,4 @@
-import { FormEvent, MouseEvent, useEffect, useRef, useState } from "react";
+
 import { MousePointer2 } from "lucide-react";
 import { AppConfig, Campaign } from "../types/campaign";
 import { ContributorSummary } from "./ContributorSummary";
@@ -14,8 +14,7 @@ interface CampaignDetailPanelProps {
   isLoading?: boolean;
   isPledgePending?: boolean;
   onConnectWallet?: () => Promise<void>;
-  onDisconnectWallet?: () => void;
-  onPledge?: (campaignId: string, amount: number) => Promise<void>;
+
   onClaim?: (campaign: Campaign) => Promise<void>;
   onSoftDelete?: (campaignId: string) => Promise<void>;
   onRefund?: (campaignId: string, contributor: string) => Promise<void>;
@@ -52,12 +51,14 @@ export function CampaignDetailPanel({
   onRefund = async () => {},
 }: CampaignDetailPanelProps) {
   const [pledgeAmount, setPledgeAmount] = useState("25");
+  const [selectedAsset, setSelectedAsset] = useState(campaign?.acceptedTokens[0] ?? "");
   const [refundContributor, setRefundContributor] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmingPledge, setIsConfirmingPledge] = useState(false);
   const [pendingPledgeDetails, setPendingPledgeDetails] = useState<
     | {
         amount: number;
+        assetCode: string;
         contributor: string;
       }
     | null
@@ -66,6 +67,7 @@ export function CampaignDetailPanel({
 
   useEffect(() => {
     setPledgeAmount("25");
+    setSelectedAsset(campaign?.acceptedTokens[0] ?? "");
     setRefundContributor(connectedWallet ?? "");
   }, [campaign?.id, connectedWallet]);
 
@@ -127,7 +129,7 @@ export function CampaignDetailPanel({
       return;
     }
 
-    setPendingPledgeDetails({ amount, contributor: connectedWallet });
+    setPendingPledgeDetails({ amount, assetCode: selectedAsset, contributor: connectedWallet });
     setIsConfirmingPledge(true);
   }
 
@@ -140,7 +142,7 @@ export function CampaignDetailPanel({
     setIsConfirmingPledge(false);
 
     try {
-      await onPledge(activeCampaign.id, pendingPledgeDetails.amount);
+      await onPledge(activeCampaign.id, pendingPledgeDetails.amount, pendingPledgeDetails.assetCode);
     } finally {
       setIsSubmitting(false);
       setPendingPledgeDetails(null);
@@ -208,8 +210,8 @@ export function CampaignDetailPanel({
           </div>
         </article>
         <article className="detail-stat">
-          <span>Asset</span>
-          <strong>{activeCampaign.assetCode}</strong>
+          <span>Accepted Assets</span>
+          <strong>{activeCampaign.acceptedTokens.join(", ")}</strong>
         </article>
         <article className="detail-stat">
           <span>Remaining</span>
@@ -223,7 +225,7 @@ export function CampaignDetailPanel({
 
       <ContributorSummary
         pledges={activeCampaign.pledges}
-        assetCode={activeCampaign.assetCode}
+        assetCode={activeCampaign.assetCode} // This might need updating too, but ContributorSummary might just show the list
         isLoading={isLoading}
       />
 
@@ -244,6 +246,23 @@ export function CampaignDetailPanel({
             readOnly
           />
         </label>
+
+        {activeCampaign.acceptedTokens.length > 1 && (
+          <label className="field-group">
+            <span>Pledge asset</span>
+            <select
+              value={selectedAsset}
+              onChange={(e) => setSelectedAsset(e.target.value)}
+              required
+            >
+              {activeCampaign.acceptedTokens.map((token) => (
+                <option key={token} value={token}>
+                  {token}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="field-group">
           <span>Pledge amount</span>
@@ -319,7 +338,7 @@ export function CampaignDetailPanel({
               <div className="modal-detail-item">
                 <span>Amount</span>
                 <strong>
-                  {pendingPledgeDetails.amount} {activeCampaign.assetCode}
+                  {pendingPledgeDetails.amount} {pendingPledgeDetails.assetCode}
                 </strong>
               </div>
             </div>

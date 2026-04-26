@@ -487,6 +487,7 @@ app.get("/api/config", (_req: Request, res: Response) => {
       networkPassphrase: config.sorobanNetworkPassphrase,
       contractAmountDecimals: CONTRACT_AMOUNT_DECIMALS,
       walletIntegrationReady,
+      assetAddresses: config.assetAddresses,
     },
   });
 });
