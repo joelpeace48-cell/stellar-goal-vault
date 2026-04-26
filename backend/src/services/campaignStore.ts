@@ -201,6 +201,19 @@ export function initCampaignStore(): void {
   initDb();
 }
 
+function checkContributorLimit(campaign: CampaignRecord, contributor: string, amount: number): void {
+  if (campaign.maxPerContributor !== undefined && campaign.maxPerContributor > 0) {
+    const existingPledged = getContributorPledgedTotal(campaign.id, contributor);
+    if (existingPledged + amount > campaign.maxPerContributor) {
+      throw toServiceError(
+        "Pledge exceeds maximum allowed per contributor.",
+        400,
+        "MAX_PER_CONTRIBUTOR_EXCEEDED"
+      );
+    }
+  }
+}
+
 export function calculateProgress(
   campaign: CampaignRecord,
   at = nowInSeconds(),
@@ -423,9 +436,6 @@ export function createCampaign(input: CampaignInput): CampaignRecord {
   );
 
   return campaign;
-}
-
-
 }
 
 export function addPledge(campaignId: string, input: PledgeInput): CampaignRecord {

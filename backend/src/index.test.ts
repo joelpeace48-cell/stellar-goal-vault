@@ -25,8 +25,8 @@ const CONTRIBUTOR = `G${"B".repeat(55)}`;
 beforeAll(async () => {
   fs.rmSync(TEST_DB_PATH, { force: true });
   ({ parseCampaignListFilters } = await import("./index"));
-
   ({ getDb } = await import("./services/db"));
+  ({ initCampaignStore, listCampaigns, createCampaign, addPledge, calculateProgress } = await import("./services/campaignStore"));
   initCampaignStore();
 }, 20000);
 

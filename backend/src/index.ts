@@ -326,7 +326,7 @@ app.post("/api/campaigns", (req: Request, res: Response) => {
   res.status(201).json({ data: { ...campaign, progress: calculateProgress(campaign) } });
 });
 
-
+app.post("/api/campaigns/:id/pledges", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUESTS), (req: Request, res: Response) => {
   const parsedId = parseCampaignId(req.params.id);
   if (!parsedId.ok) {
     sendValidationError(parsedId.issues);
@@ -380,35 +380,39 @@ app.post("/api/campaigns/:id/claim", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUEST
   res.json({ data: { ...campaign, progress: calculateProgress(campaign) } });
 });
 
-app.post("/api/campaigns/:id/refund", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUESTS), async (req: Request, res: Response) => {
-  const parsedId = parseCampaignId(req.params.id);
-  if (!parsedId.ok) {
-    sendValidationError(parsedId.issues);
+app.post("/api/campaigns/:id/refund", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUESTS), async (req: Request, res: Response, next: express.NextFunction) => {
+  try {
+    const parsedId = parseCampaignId(req.params.id);
+    if (!parsedId.ok) {
+      sendValidationError(parsedId.issues);
+    }
+
+    const parsedBody = refundPayloadSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      sendValidationError(parsedBody.error.issues);
+    }
+
+    ensureSorobanRefundConfig();
+    const verified = await verifyRefundTransaction(parsedBody.data.soroban.txHash);
+    const result = refundContributor(parsedId.value, parsedBody.data.contributor, {
+      ...parsedBody.data.soroban,
+      txHash: verified.txHash,
+      ledger: verified.ledger ?? parsedBody.data.soroban.ledger,
+      createdAt: verified.createdAt ?? parsedBody.data.soroban.createdAt,
+      latestLedger: verified.latestLedger ?? parsedBody.data.soroban.latestLedger,
+      source: "soroban-contract",
+    });
+
+    res.json({
+      data: {
+        ...result.campaign,
+        progress: calculateProgress(result.campaign),
+        refundedAmount: result.refundedAmount,
+      },
+    });
+  } catch (error) {
+    next(error);
   }
-
-  const parsedBody = refundPayloadSchema.safeParse(req.body);
-  if (!parsedBody.success) {
-    sendValidationError(parsedBody.error.issues);
-  }
-
-  ensureSorobanRefundConfig();
-  const verified = await verifyRefundTransaction(parsedBody.data.soroban.txHash);
-  const result = refundContributor(parsedId.value, parsedBody.data.contributor, {
-    ...parsedBody.data.soroban,
-    txHash: verified.txHash,
-    ledger: verified.ledger ?? parsedBody.data.soroban.ledger,
-    createdAt: verified.createdAt ?? parsedBody.data.soroban.createdAt,
-    latestLedger: verified.latestLedger ?? parsedBody.data.soroban.latestLedger,
-    source: "soroban-contract",
-  });
-
-  res.json({
-    data: {
-      ...result.campaign,
-      progress: calculateProgress(result.campaign),
-      refundedAmount: result.refundedAmount,
-    },
-  });
 });
 
 app.get("/api/campaigns/:id/history", (req: Request, res: Response) => {
