@@ -249,6 +249,10 @@ That issue is already represented in:
 - `OPEN_SOURCE_ISSUES.md`
 - The frontend backlog panel
 
+## Contributing
+Please see the [Contributing Guide](./CONTRIBUTING.md) for setup and contribution guidelines.
+
+
 ## Known limitations
 
 - Campaign creation is still local-first, so pledges will only simulate successfully for campaign IDs that also exist in the configured contract
