@@ -7,15 +7,21 @@ import { config, walletIntegrationReady } from "./config";
 import {
   addPledge,
   calculateProgress,
+  CampaignProgress,
+  CampaignRecord,
   CampaignStatus,
   claimCampaign,
   createCampaign,
   getCampaign,
   getCampaignWithProgress,
+  getGlobalStats,
   initCampaignStore,
   listCampaigns,
+  type ListCampaignsOptions,
+  softDeleteCampaign,
   reconcileOnChainPledge,
   refundContributor,
+  updateCampaign,
 } from "./services/campaignStore";
 import { checkDbHealth } from "./services/db";
 import { getCampaignHistory } from "./services/eventHistory";
@@ -28,18 +34,32 @@ import {
   claimCampaignPayloadSchema,
   createCampaignPayloadSchema,
   createPledgePayloadSchema,
-  paginationSchema,
+  parseCampaignListPaginationQuery,
   reconcilePledgePayloadSchema,
   refundPayloadSchema,
+  updateCampaignPayloadSchema,
   zodIssuesToErrorMessage,
   zodIssuesToValidationIssues,
 } from "./validation/schemas";
 import { logError, logInfo, logRequest } from "./logger";
 
+type RequestWithId = Request & { requestId?: string };
+
+
 export const app = express();
+
+interface RequestWithId extends Request {
+  requestId?: string;
+}
+
+import { CampaignRecord, CampaignProgress } from "./services/campaignStore";
+type CampaignListItem = CampaignRecord & { progress: CampaignProgress };
 
 const CAMPAIGN_STATUSES: CampaignStatus[] = ["open", "funded", "claimed", "failed"];
 const CONTRACT_AMOUNT_DECIMALS = Number(process.env.CONTRACT_AMOUNT_DECIMALS ?? 2);
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 120;
+const WRITE_RATE_LIMIT_MAX_REQUESTS = 40;
 
 
 app.use(
@@ -58,9 +78,7 @@ app.use(
 
 app.use(express.json());
 
-app.use((req: Request, res: Response, next: express.NextFunction) => {
-  const requestWithId = req as RequestWithId;
-  requestWithId.requestId = randomUUID();
+
   const startedAt = process.hrtime.bigint();
 
   res.on("finish", () => {
@@ -147,15 +165,18 @@ export function parseCampaignListFilters(query: {
   asset?: unknown;
   status?: unknown;
   q?: unknown;
+  includeDeleted?: unknown;
 }): {
   asset?: string;
   status?: CampaignStatus;
   searchQuery?: string;
+  includeDeleted?: boolean;
 } {
   return {
     asset: normalizeAssetFilter(query.asset),
     status: normalizeStatusFilter(query.status),
     searchQuery: normalizeQueryValue(query.q),
+    includeDeleted: query.includeDeleted === 'true',
   };
 }
 
@@ -188,27 +209,33 @@ app.get("/api/health", (_req: Request, res: Response) => {
 });
 
 app.get("/api/campaigns", (req: Request, res: Response) => {
-  const paginationResult = paginationSchema.safeParse({
+  const paginationResult = parseCampaignListPaginationQuery({
     page: req.query.page,
     limit: req.query.limit,
   });
-  if (!paginationResult.success) {
-    sendValidationError(paginationResult.error.issues);
+  if (!paginationResult.ok) {
+    sendValidationError(paginationResult.issues);
   }
 
   const filters = parseCampaignListFilters({
     asset: req.query.asset,
     status: req.query.status,
     q: req.query.q,
+    includeDeleted: req.query.includeDeleted,
   });
-  const { page, limit } = paginationResult.data;
-  const { campaigns, totalCount } = listCampaigns({
+
+  const listOptions: ListCampaignsOptions = {
     searchQuery: filters.searchQuery,
     assetCode: filters.asset,
     status: filters.status,
-    page,
-    limit,
-  });
+    includeDeleted: filters.includeDeleted,
+  };
+  if (paginationResult.page !== undefined) {
+    listOptions.page = paginationResult.page;
+    listOptions.limit = paginationResult.limit;
+  }
+
+  const { campaigns, totalCount } = listCampaigns(listOptions);
 
   const data = filterCampaignList(
     campaigns.map((campaign) => ({
@@ -218,13 +245,20 @@ app.get("/api/campaigns", (req: Request, res: Response) => {
     filters,
   );
 
+  const page = paginationResult.page ?? 1;
+  const limit = paginationResult.limit ?? totalCount;
+  const totalPages =
+    paginationResult.limit === undefined || limit <= 0
+      ? 1
+      : Math.max(1, Math.ceil(totalCount / limit));
+
   res.json({
     data,
     pagination: {
-      totalCount,
+      total: totalCount,
       page,
       limit,
-      totalPages: Math.ceil(totalCount / limit),
+      totalPages,
     },
   });
 });
@@ -247,17 +281,24 @@ app.post("/api/campaigns", (req: Request, res: Response) => {
   const parsedBody = createCampaignPayloadSchema.safeParse(req.body);
   if (!parsedBody.success) {
     sendValidationError(parsedBody.error.issues);
+    return;
   }
 
   if (parsedBody.data.deadline <= Math.floor(Date.now() / 1000)) {
     throw new AppError("deadline must be in the future.", 400, "INVALID_DEADLINE");
   }
 
-  const campaign = createCampaign(parsedBody.data);
+  const campaignInput = {
+    ...parsedBody.data,
+    maxPerContributor:
+      parsedBody.data.maxPerContributor ?? (config.defaultMaxPerContributor > 0 ? config.defaultMaxPerContributor : undefined),
+  };
+
+  const campaign = createCampaign(campaignInput);
   res.status(201).json({ data: { ...campaign, progress: calculateProgress(campaign) } });
 });
 
-app.post("/api/campaigns/:id/pledges", (req: Request, res: Response) => {
+
   const parsedId = parseCampaignId(req.params.id);
   if (!parsedId.ok) {
     sendValidationError(parsedId.issues);
@@ -272,7 +313,7 @@ app.post("/api/campaigns/:id/pledges", (req: Request, res: Response) => {
   res.status(201).json({ data: { ...campaign, progress: calculateProgress(campaign) } });
 });
 
-app.post("/api/campaigns/:id/pledges/reconcile", (req: Request, res: Response) => {
+app.post("/api/campaigns/:id/pledges/reconcile", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUESTS), (req: Request, res: Response) => {
   const parsedId = parseCampaignId(req.params.id);
   if (!parsedId.ok) {
     sendValidationError(parsedId.issues);
@@ -292,7 +333,7 @@ app.post("/api/campaigns/:id/pledges/reconcile", (req: Request, res: Response) =
   });
 });
 
-app.post("/api/campaigns/:id/claim", (req: Request, res: Response) => {
+app.post("/api/campaigns/:id/claim", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUESTS), (req: Request, res: Response) => {
   const parsedId = parseCampaignId(req.params.id);
   if (!parsedId.ok) {
     sendValidationError(parsedId.issues);
@@ -311,7 +352,7 @@ app.post("/api/campaigns/:id/claim", (req: Request, res: Response) => {
   res.json({ data: { ...campaign, progress: calculateProgress(campaign) } });
 });
 
-app.post("/api/campaigns/:id/refund", async (req: Request, res: Response) => {
+app.post("/api/campaigns/:id/refund", applyRateLimit(WRITE_RATE_LIMIT_MAX_REQUESTS), async (req: Request, res: Response) => {
   const parsedId = parseCampaignId(req.params.id);
   if (!parsedId.ok) {
     sendValidationError(parsedId.issues);
@@ -378,6 +419,11 @@ app.get("/api/config", (_req: Request, res: Response) => {
       walletIntegrationReady,
     },
   });
+});
+
+app.get("/api/stats", (_req: Request, res: Response) => {
+  const stats = getGlobalStats();
+  res.json({ data: stats });
 });
 
 app.use((err: any, req: Request, res: Response, _next: express.NextFunction) => {
