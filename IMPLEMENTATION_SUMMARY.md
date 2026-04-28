@@ -8,7 +8,7 @@ I have successfully implemented comprehensive property-based tests for the Stell
 
 ---
 
-## What Was Delivered
+## What Was Delivered?
 
 ### 1. Updated Dependencies
 **File:** `contracts/Cargo.toml`
