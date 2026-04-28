@@ -20,7 +20,7 @@ export default function NFTPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* NFT Selection */}
+                {/* NFT Selections */}
                 <div className="space-y-4">
                     <h2 className="text-xl font-bold">Your Wallet NFTs</h2>
                     <div className="grid grid-cols-2 gap-4">
